@@ -237,7 +237,7 @@ class multiindex_duplicated(object):
     def setup(self):
         (n, k) = (200, 5000)
         self.levels = [np.arange(n), tm.makeStringIndex(n).values, (1000 + np.arange(n))]
-        self.labels = [np.random.choice(n, (k * n)) for lev in self.levels]
+        self.labels = [np.random.choice(n, (k * n)) for _ in self.levels]
         self.mi = MultiIndex(levels=self.levels, labels=self.labels)
 
     def time_multiindex_duplicated(self):

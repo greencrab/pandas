@@ -61,20 +61,19 @@ def upload_stable_pdf(user='pandas'):
 
 def upload_prev(ver, doc_root='./', user='pandas'):
     'push a copy of older release to appropriate version directory'
-    local_dir = doc_root + 'build/html'
-    remote_dir = '/usr/share/nginx/pandas/pandas-docs/version/%s/' % ver
+    local_dir = f'{doc_root}build/html'
+    remote_dir = f'/usr/share/nginx/pandas/pandas-docs/version/{ver}/'
     cmd = 'cd %s; rsync -avz . %s@pandas.pydata.org:%s -essh'
-    cmd = cmd % (local_dir, user, remote_dir)
+    cmd %= (local_dir, user, remote_dir)
     print(cmd)
     if os.system(cmd):
-        raise SystemExit(
-            'Upload to %s from %s failed' % (remote_dir, local_dir))
+        raise SystemExit(f'Upload to {remote_dir} from {local_dir} failed')
 
-    local_dir = doc_root + 'build/latex'
+    local_dir = f'{doc_root}build/latex'
     pdf_cmd = 'cd %s; scp pandas.pdf %s@pandas.pydata.org:%s'
-    pdf_cmd = pdf_cmd % (local_dir, user, remote_dir)
+    pdf_cmd %= (local_dir, user, remote_dir)
     if os.system(pdf_cmd):
-        raise SystemExit('Upload PDF to %s from %s failed' % (ver, doc_root))
+        raise SystemExit(f'Upload PDF to {ver} from {doc_root} failed')
 
 def build_pandas():
     os.chdir('..')
@@ -83,7 +82,7 @@ def build_pandas():
     os.chdir('doc')
 
 def build_prev(ver):
-    if os.system('git checkout v%s' % ver) != 1:
+    if os.system(f'git checkout v{ver}') != 1:
         os.chdir('..')
         os.system('python setup.py clean')
         os.system('python setup.py build_ext --inplace')
@@ -164,7 +163,6 @@ def latex_forced():
         os.system('pdflatex -interaction=nonstopmode pandas.tex')
         raise SystemExit("You should check the file 'build/latex/pandas.pdf' for problems.")
 
-        os.chdir('../..')
     else:
         print('latex build has not been tested on windows')
 
@@ -206,7 +204,7 @@ def auto_dev_build(debug=False):
             sendmail(step)
     except (Exception, SystemExit) as inst:
         msg = str(inst) + '\n'
-        sendmail(step, '[ERROR] ' + msg)
+        sendmail(step, f'[ERROR] {msg}')
 
 
 def sendmail(step=None, err_msg=None):
@@ -216,11 +214,11 @@ def sendmail(step=None, err_msg=None):
         step = ''
 
     if err_msg is None or '[ERROR]' not in err_msg:
-        msgstr = 'Daily docs %s completed successfully' % step
-        subject = "DOC: %s successful" % step
+        msgstr = f'Daily docs {step} completed successfully'
+        subject = f"DOC: {step} successful"
     else:
         msgstr = err_msg
-        subject = "DOC: %s failed" % step
+        subject = f"DOC: {step} failed"
 
     import smtplib
     from email.MIMEText import MIMEText
@@ -246,26 +244,25 @@ def _get_dir(subdir=None):
     import getpass
     USERNAME = getpass.getuser()
     if sys.platform == 'darwin':
-        HOME = '/Users/%s' % USERNAME
+        HOME = f'/Users/{USERNAME}'
     else:
-        HOME = '/home/%s' % USERNAME
+        HOME = f'/home/{USERNAME}'
 
     if subdir is None:
         subdir = '/code/scripts/config'
-    conf_dir = '%s/%s' % (HOME, subdir)
-    return conf_dir
+    return f'{HOME}/{subdir}'
 
 
 def _get_credentials():
     tmp_dir = _get_dir()
-    cred = '%s/credentials' % tmp_dir
+    cred = f'{tmp_dir}/credentials'
     with open(cred, 'r') as fh:
         server, port, un, domain = fh.read().split(',')
     port = int(port)
-    login = un + '@' + domain + '.com'
+    login = f'{un}@{domain}.com'
 
     import base64
-    with open('%s/cron_email_pwd' % tmp_dir, 'r') as fh:
+    with open(f'{tmp_dir}/cron_email_pwd', 'r') as fh:
         pwd = base64.b64decode(fh.read())
 
     return server, port, login, pwd
@@ -273,7 +270,7 @@ def _get_credentials():
 
 def _get_config():
     tmp_dir = _get_dir()
-    with open('%s/addresses' % tmp_dir, 'r') as fh:
+    with open(f'{tmp_dir}/addresses', 'r') as fh:
         from_name, to_name = fh.read().split(',')
     return from_name, to_name
 
@@ -325,8 +322,10 @@ def generate_index(api=True, single=False, **kwds):
         f.write(t.render(api=api,single=single,**kwds))
 
 import argparse
-argparser = argparse.ArgumentParser(description="pandas documentation builder",
-                                    epilog="Targets : %s" % funcd.keys())
+argparser = argparse.ArgumentParser(
+    description="pandas documentation builder",
+    epilog=f"Targets : {funcd.keys()}",
+)
 
 argparser.add_argument('--no-api',
                    default=False,
@@ -359,14 +358,15 @@ def main():
 
         if ftype == 'build_previous':
             build_prev(ver, user=args.user)
-        if ftype == 'upload_previous':
+        elif ftype == 'upload_previous':
             upload_prev(ver, user=args.user)
     elif len(sys.argv) == 2:
         for arg in sys.argv[1:]:
             func = funcd.get(arg)
             if func is None:
-                raise SystemExit('Do not know how to handle %s; valid args are %s' % (
-                    arg, list(funcd.keys())))
+                raise SystemExit(
+                    f'Do not know how to handle {arg}; valid args are {list(funcd.keys())}'
+                )
             if args.user:
                 func(user=args.user)
             else:

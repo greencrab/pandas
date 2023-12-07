@@ -570,9 +570,7 @@ class BaseExprVisitor(ast.NodeVisitor):
         return self.visit(ast.BoolOp(op=ast.And(), values=values))
 
     def _try_visit_binop(self, bop):
-        if isinstance(bop, (Op, Term)):
-            return bop
-        return self.visit(bop)
+        return bop if isinstance(bop, (Op, Term)) else self.visit(bop)
 
     def visit_BoolOp(self, node, **kwargs):
         def visitor(x, y):

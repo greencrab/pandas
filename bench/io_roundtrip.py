@@ -12,7 +12,7 @@ from pandas import datetools, DatetimeIndex
 def timeit(f, iterations):
     start = time.clock()
 
-    for i in range(iterations):
+    for _ in range(iterations):
         f()
 
     return time.clock() - start

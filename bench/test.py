@@ -48,20 +48,14 @@ def group_mean_naive(lat, lon, data):
     for lt, ln, da in zip(lat, lon, data):
         grouped[(lt, ln)].append(da)
 
-    averaged = dict((ltln, np.mean(da)) for ltln, da in grouped.items())
-
-    return averaged
+    return {ltln: np.mean(da) for ltln, da in grouped.items()}
 
 
 def group_agg(values, bounds, f):
     N = len(values)
     result = np.empty(len(bounds), dtype=float)
     for i, left_bound in enumerate(bounds):
-        if i == len(bounds) - 1:
-            right_bound = N
-        else:
-            right_bound = bounds[i + 1]
-
+        right_bound = N if i == len(bounds) - 1 else bounds[i + 1]
         result[i] = f(values[left_bound: right_bound])
 
     return result

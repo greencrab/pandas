@@ -22,23 +22,16 @@ class SphinxDocString(NumpyDocString):
 
     # string conversion routines
     def _str_header(self, name, symbol='`'):
-        return ['.. rubric:: ' + name, '']
+        return [f'.. rubric:: {name}', '']
 
     def _str_field_list(self, name):
-        return [':' + name + ':']
+        return [f':{name}:']
 
     def _str_indent(self, doc, indent=4):
-        out = []
-        for line in doc:
-            out += [' '*indent + line]
-        return out
+        return [' '*indent + line for line in doc]
 
     def _str_signature(self):
         return ['']
-        if self['Signature']:
-            return ['``%s``' % self['Signature']] + ['']
-        else:
-            return ['']
 
     def _str_summary(self):
         return self['Summary'] + ['']
@@ -53,8 +46,7 @@ class SphinxDocString(NumpyDocString):
             out += ['']
             for param, param_type, desc in self['Returns']:
                 if param_type:
-                    out += self._str_indent(['**%s** : %s' % (param.strip(),
-                                                              param_type)])
+                    out += self._str_indent([f'**{param.strip()}** : {param_type}'])
                 else:
                     out += self._str_indent([param.strip()])
                 if desc:
@@ -70,10 +62,9 @@ class SphinxDocString(NumpyDocString):
             out += ['']
             for param, param_type, desc in self[name]:
                 if param_type:
-                    out += self._str_indent(['**%s** : %s' % (param.strip(),
-                                                              param_type)])
+                    out += self._str_indent([f'**{param.strip()}** : {param_type}'])
                 else:
-                    out += self._str_indent(['**%s**' % param.strip()])
+                    out += self._str_indent([f'**{param.strip()}**'])
                 if desc:
                     out += ['']
                     out += self._str_indent(desc, 8)
@@ -96,11 +87,11 @@ class SphinxDocString(NumpyDocString):
         """
         out = []
         if self[name]:
-            out += ['.. rubric:: %s' % name, '']
+            out += [f'.. rubric:: {name}', '']
             prefix = getattr(self, '_name', '')
 
             if prefix:
-                prefix = '~%s.' % prefix
+                prefix = f'~{prefix}.'
 
             autosum = []
             others = []
@@ -116,7 +107,7 @@ class SphinxDocString(NumpyDocString):
 
                 if param_obj and (pydoc.getdoc(param_obj) or not desc):
                     # Referenced object has a docstring
-                    autosum += ["   %s%s" % (prefix, param)]
+                    autosum += [f"   {prefix}{param}"]
                 else:
                     others.append((param, param_type, desc))
 
@@ -127,14 +118,14 @@ class SphinxDocString(NumpyDocString):
                 out += [''] + autosum
 
             if others:
-                maxlen_0 = max(3, max([len(x[0]) for x in others]))
+                maxlen_0 = max(3, max(len(x[0]) for x in others))
                 hdr = sixu("=")*maxlen_0 + sixu("  ") + sixu("=")*10
                 fmt = sixu('%%%ds  %%s  ') % (maxlen_0,)
                 out += ['', hdr]
                 for param, param_type, desc in others:
                     desc = sixu(" ").join(x.strip() for x in desc).strip()
                     if param_type:
-                        desc = "(%s) %s" % (param_type, desc)
+                        desc = f"({param_type}) {desc}"
                     out += [fmt % (param.strip(), desc)]
                 out += [hdr]
             out += ['']
@@ -171,14 +162,14 @@ class SphinxDocString(NumpyDocString):
         if len(idx) == 0:
             return out
 
-        out += ['.. index:: %s' % idx.get('default','')]
+        out += [f".. index:: {idx.get('default', '')}"]
         for section, references in idx.items():
             if section == 'default':
                 continue
             elif section == 'refguide':
-                out += ['   single: %s' % (', '.join(references))]
+                out += [f"   single: {', '.join(references)}"]
             else:
-                out += ['   %s: %s' % (section, ','.join(references))]
+                out += [f"   {section}: {','.join(references)}"]
         return out
 
     def _str_references(self):
@@ -197,25 +188,26 @@ class SphinxDocString(NumpyDocString):
                 out += ['.. latexonly::','']
             items = []
             for line in self['References']:
-                m = re.match(r'.. \[([a-z0-9._-]+)\]', line, re.I)
-                if m:
+                if m := re.match(r'.. \[([a-z0-9._-]+)\]', line, re.I):
                     items.append(m.group(1))
-            out += ['   ' + ", ".join(["[%s]_" % item for item in items]), '']
+            out += ['   ' + ", ".join([f"[{item}]_" for item in items]), '']
         return out
 
     def _str_examples(self):
         examples_str = "\n".join(self['Examples'])
 
-        if (self.use_plots and 'import matplotlib' in examples_str
-                and 'plot::' not in examples_str):
-            out = []
-            out += self._str_header('Examples')
-            out += ['.. plot::', '']
-            out += self._str_indent(self['Examples'])
-            out += ['']
-            return out
-        else:
+        if (
+            not self.use_plots
+            or 'import matplotlib' not in examples_str
+            or 'plot::' in examples_str
+        ):
             return self._str_section('Examples')
+        out = []
+        out += self._str_header('Examples')
+        out += ['.. plot::', '']
+        out += self._str_indent(self['Examples'])
+        out += ['']
+        return out
 
     def __str__(self, indent=0, func_role="obj"):
         out = []

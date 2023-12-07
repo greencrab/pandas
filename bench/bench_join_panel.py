@@ -5,7 +5,7 @@ def create_panels_append(cls, panels):
         """ return an append list of panels """
         panels = [a for a in panels if a is not None]
         # corner cases
-        if len(panels) == 0:
+        if not panels:
                 return None
         elif len(panels) == 1:
                 return panels[0]
@@ -25,6 +25,7 @@ def create_panels_append(cls, panels):
                 new_panels = [p.reindex(**{axis_reindex: new_axis,
                                         'copy': False}) for p in panels]
                 return new_panels, new_axis
+
         # create the joint major index, dont' reindex the sub-panels - we are
         # appending
         major = joint_index_for_axis(panels, 'major_axis')
@@ -36,8 +37,9 @@ def create_panels_append(cls, panels):
         try:
                 values = np.concatenate([p.values for p in panels], axis=1)
         except Exception as detail:
-                raise Exception("cannot append values that dont' match dimensions! -> [%s] %s"
-                                % (','.join(["%s" % p for p in panels]), str(detail)))
+                raise Exception(
+                    f"""cannot append values that dont' match dimensions! -> [{','.join([f"{p}" for p in panels])}] {str(detail)}"""
+                )
         # pm('append - create_panel')
         p = Panel(values, items=items, major_axis=major,
                   minor_axis=minor)
@@ -51,7 +53,7 @@ def create_panels_join(cls, panels):
         """ given an array of panels's, create a single panel """
         panels = [a for a in panels if a is not None]
         # corner cases
-        if len(panels) == 0:
+        if not panels:
                 return None
         elif len(panels) == 1:
                 return panels[0]

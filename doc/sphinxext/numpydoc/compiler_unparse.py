@@ -83,7 +83,7 @@ class UnparseCompilerAst:
             for t in tree:
                 self._dispatch(t)
             return
-        meth = getattr(self, "_"+tree.__class__.__name__)
+        meth = getattr(self, f"_{tree.__class__.__name__}")
         if tree.__class__.__name__ == 'NoneType' and not self._do_indent:
             return
         meth(tree)
@@ -111,7 +111,7 @@ class UnparseCompilerAst:
         """ Handle assigning an attribute of an object
         """
         self._dispatch(t.expr)
-        self._write('.'+t.attrname)
+        self._write(f'.{t.attrname}')
 
     def _Assign(self, t):
         """ Expression Assignment such as "a = 1".
@@ -153,7 +153,7 @@ class UnparseCompilerAst:
 
         self._fill()
         self._dispatch(t.node)
-        self._write(' '+t.op+' ')
+        self._write(f' {t.op} ')
         self._dispatch(t.expr)
         if not self._do_indent:
             self._write(';')
@@ -205,7 +205,7 @@ class UnparseCompilerAst:
     def _Compare(self, t):
         self._dispatch(t.expr)
         for op, expr in t.ops:
-            self._write(" " + op + " ")
+            self._write(f" {op} ")
             self._dispatch(expr)
 
     def _Const(self, t):
@@ -253,7 +253,7 @@ class UnparseCompilerAst:
                 self._write(", ")
             self._write(name)
             if asname is not None:
-                self._write(" as "+asname)
+                self._write(f" as {asname}")
 
     def _Function(self, t):
         """ Handle function definitions
@@ -261,7 +261,7 @@ class UnparseCompilerAst:
         if t.decorators is not None:
             self._fill("@")
             self._dispatch(t.decorators)
-        self._fill("def "+t.name + "(")
+        self._fill(f"def {t.name}(")
         defaults = [None] * (len(t.argnames) - len(t.defaults)) + list(t.defaults)
         for i, arg in enumerate(zip(t.argnames, defaults)):
             self._write(arg[0])
@@ -287,8 +287,8 @@ class UnparseCompilerAst:
             self._write(')')
         else:
             self._dispatch(t.expr)
-            
-        self._write('.'+t.attrname)
+
+        self._write(f'.{t.attrname}')
         
     def _If(self, t):
         self._fill()
@@ -327,13 +327,13 @@ class UnparseCompilerAst:
         """ Handle "import xyz.foo".
         """
         self._fill("import ")
-        
+
         for i, (name,asname) in enumerate(t.names):
             if i != 0:
                 self._write(", ")
             self._write(name)
             if asname is not None:
-                self._write(" as "+asname)
+                self._write(f" as {asname}")
 
     def _Keyword(self, t):
         """ Keyword value assignment within function calls and definitions.

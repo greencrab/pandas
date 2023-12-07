@@ -40,13 +40,15 @@ sdf = dm.to_sparse()
 
 
 def new_data_like(sdf):
-    new_data = {}
-    for col, series in compat.iteritems(sdf):
-        new_data[col] = SparseSeries(np.random.randn(len(series.sp_values)),
-                                     index=sdf.index,
-                                     sparse_index=series.sp_index,
-                                     fill_value=series.fill_value)
-
+    new_data = {
+        col: SparseSeries(
+            np.random.randn(len(series.sp_values)),
+            index=sdf.index,
+            sparse_index=series.sp_index,
+            fill_value=series.fill_value,
+        )
+        for col, series in compat.iteritems(sdf)
+    }
     return SparseDataFrame(new_data)
 
 # data = {}

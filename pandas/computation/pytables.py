@@ -162,7 +162,7 @@ class BinOp(ops.BinOp):
     def generate(self, v):
         """ create and return the op string for this TermValue """
         val = v.tostring(self.encoding)
-        return "(%s %s %s)" % (self.lhs, self.op, val)
+        return f"({self.lhs} {self.op} {val})"
 
     def convert_value(self, v):
         """ convert the expression that is in the term to something that is
@@ -178,7 +178,7 @@ class BinOp(ops.BinOp):
 
         kind = _ensure_decoded(self.kind)
         meta = _ensure_decoded(self.meta)
-        if kind == u('datetime64') or kind == u('datetime'):
+        if kind in [u('datetime64'), u('datetime')]:
             if isinstance(v, (int, float)):
                 v = stringify(v)
             v = _ensure_decoded(v)
@@ -190,7 +190,7 @@ class BinOp(ops.BinOp):
                 kind == u('date')):
             v = time.mktime(v.timetuple())
             return TermValue(v, pd.Timestamp(v), kind)
-        elif kind == u('timedelta64') or kind == u('timedelta'):
+        elif kind in [u('timedelta64'), u('timedelta')]:
             v = _coerce_scalar_to_timedelta_type(v, unit='s').value
             return TermValue(int(v), v, kind)
         elif meta == u('category'):
@@ -205,9 +205,17 @@ class BinOp(ops.BinOp):
             return TermValue(v, v, kind)
         elif kind == u('bool'):
             if isinstance(v, string_types):
-                v = not v.strip().lower() in [u('false'), u('f'), u('no'),
-                                              u('n'), u('none'), u('0'),
-                                              u('[]'), u('{}'), u('')]
+                v = v.strip().lower() not in [
+                    u('false'),
+                    u('f'),
+                    u('no'),
+                    u('n'),
+                    u('none'),
+                    u('0'),
+                    u('[]'),
+                    u('{}'),
+                    u(''),
+                ]
             else:
                 v = bool(v)
             return TermValue(v, v, kind)
@@ -243,7 +251,7 @@ class FilterBinOp(BinOp):
     def evaluate(self):
 
         if not self.is_valid:
-            raise ValueError("query term is not valid [%s]" % self)
+            raise ValueError(f"query term is not valid [{self}]")
 
         rhs = self.conform(self.rhs)
         values = [TermValue(v, v, self.kind) for v in rhs]
@@ -273,8 +281,8 @@ class FilterBinOp(BinOp):
 
         else:
             raise TypeError(
-                "passing a filterable condition to a non-table indexer [%s]" %
-                self)
+                f"passing a filterable condition to a non-table indexer [{self}]"
+            )
 
         return self
 
@@ -314,7 +322,7 @@ class ConditionBinOp(BinOp):
     def evaluate(self):
 
         if not self.is_valid:
-            raise ValueError("query term is not valid [%s]" % self)
+            raise ValueError(f"query term is not valid [{self}]")
 
         # convert values if we are in the table
         if not self.is_in_table:
@@ -326,14 +334,11 @@ class ConditionBinOp(BinOp):
         # equality conditions
         if self.op in ['==', '!=']:
 
-            # too many values to create the expression?
-            if len(values) <= self._max_selectors:
-                vs = [self.generate(v) for v in values]
-                self.condition = "(%s)" % ' | '.join(vs)
-
-            # use a filter after reading
-            else:
+            if len(values) > self._max_selectors:
                 return None
+            vs = [self.generate(v) for v in values]
+            self.condition = f"({' | '.join(vs)})"
+
         else:
             self.condition = self.generate(values[0])
 
@@ -343,10 +348,7 @@ class ConditionBinOp(BinOp):
 class JointConditionBinOp(ConditionBinOp):
 
     def evaluate(self):
-        self.condition = "(%s %s %s)" % (
-            self.lhs.condition,
-            self.op,
-            self.rhs.condition)
+        self.condition = f"({self.lhs.condition} {self.op} {self.rhs.condition})"
         return self
 
 
@@ -361,13 +363,14 @@ class UnaryOp(ops.UnaryOp):
         operand = operand.prune(klass)
 
         if operand is not None:
-            if issubclass(klass, ConditionBinOp):
-                if operand.condition is not None:
-                    return operand.invert()
-            elif issubclass(klass, FilterBinOp):
-                if operand.filter is not None:
-                    return operand.invert()
-
+            if (
+                issubclass(klass, ConditionBinOp)
+                and operand.condition is not None
+                or not issubclass(klass, ConditionBinOp)
+                and issubclass(klass, FilterBinOp)
+                and operand.filter is not None
+            ):
+                return operand.invert()
         return None
 
 
@@ -504,7 +507,7 @@ class Expr(expr.Expr):
                 else:
                     w = self.parse_back_compat(w)
                     where[idx] = w
-            where = ' & ' .join(["(%s)" % w for w in where])
+            where = ' & ' .join([f"({w})" for w in where])
 
         self.expr = where
         self.env = Scope(scope_level + 1, local_dict=local_dict)
@@ -603,9 +606,7 @@ class TermValue(object):
         """ quote the string if not encoded
             else encode and return """
         if self.kind == u('string'):
-            if encoding is not None:
-                return self.converted
-            return '"%s"' % self.converted
+            return self.converted if encoding is not None else f'"{self.converted}"'
         return self.converted
 
 

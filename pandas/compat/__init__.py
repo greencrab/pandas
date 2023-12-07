@@ -393,10 +393,7 @@ class _OrderedDict(dict):
         elif not args:
             raise TypeError('update() takes at least 1 argument (0 given)')
         self = args[0]
-        # Make progressively weaker assumptions about "other"
-        other = ()
-        if len(args) == 2:
-            other = args[1]
+        other = args[1] if len(args) == 2 else ()
         if isinstance(other, dict):
             for key in other:
                 self[key] = other[key]
@@ -442,7 +439,7 @@ class _OrderedDict(dict):
         _repr_running[call_key] = 1
         try:
             if not self:
-                return '%s()' % (self.__class__.__name__,)
+                return f'{self.__class__.__name__}()'
             return '%s(%r)' % (self.__class__.__name__, list(self.items()))
         finally:
             del _repr_running[call_key]
@@ -613,7 +610,7 @@ class _Counter(dict):
 
     def __repr__(self):
         if not self:
-            return '%s()' % self.__class__.__name__
+            return f'{self.__class__.__name__}()'
         items = ', '.join(map('%r: %r'.__mod__, self.most_common()))
         return '%s({%s})' % (self.__class__.__name__, items)
 
@@ -758,7 +755,7 @@ class OrderedDefaultdict(OrderedDict):
 
 # https://github.com/pydata/pandas/pull/9123
 def is_platform_windows():
-    return sys.platform == 'win32' or sys.platform == 'cygwin'
+    return sys.platform in ['win32', 'cygwin']
 
 
 def is_platform_linux():

@@ -6,6 +6,7 @@ Offer fast expression evaluation through numexpr
 
 """
 
+
 import warnings
 import numpy as np
 from pandas.core.common import _values_from_object
@@ -31,8 +32,8 @@ _where = None
 
 # the set of dtypes that we will allow pass to numexpr
 _ALLOWED_DTYPES = {
-    'evaluate': set(['int64', 'int32', 'float64', 'float32', 'bool']),
-    'where': set(['int64', 'float64', 'bool'])
+    'evaluate': {'int64', 'int32', 'float64', 'float32', 'bool'},
+    'where': {'int64', 'float64', 'bool'},
 }
 
 # the minimum prod shape that we will use numexpr
@@ -87,7 +88,7 @@ def _can_use_numexpr(op, op_str, a, b, dtype_check):
                         return False
                     dtypes |= set(s.index)
                 elif isinstance(o, np.ndarray):
-                    dtypes |= set([o.dtype.name])
+                    dtypes |= {o.dtype.name}
 
             # allowed are a superset
             if not len(dtypes) or _ALLOWED_DTYPES[dtype_check] >= dtypes:
@@ -110,14 +111,15 @@ def _evaluate_numexpr(op, op_str, a, b, raise_on_error=False, truediv=True, reve
 
             a_value = getattr(a, "values", a)
             b_value = getattr(b, "values", b)
-            result = ne.evaluate('a_value %s b_value' % op_str,
-                                 local_dict={'a_value': a_value,
-                                             'b_value': b_value},
-                                 casting='safe', truediv=truediv,
-                                 **eval_kwargs)
+            result = ne.evaluate(
+                f'a_value {op_str} b_value',
+                local_dict={'a_value': a_value, 'b_value': b_value},
+                casting='safe',
+                truediv=truediv,
+                **eval_kwargs,
+            )
         except ValueError as detail:
-            if 'unknown type object' in str(detail):
-                pass
+            pass
         except Exception as detail:
             if raise_on_error:
                 raise
@@ -151,8 +153,7 @@ def _where_numexpr(cond, a, b, raise_on_error=False):
                                              'b_value': b_value},
                                  casting='safe')
         except ValueError as detail:
-            if 'unknown type object' in str(detail):
-                pass
+            pass
         except Exception as detail:
             if raise_on_error:
                 raise TypeError(str(detail))
@@ -212,8 +213,7 @@ def evaluate(op, op_str, a, b, raise_on_error=False, use_numexpr=True,
                          return the results
         use_numexpr : whether to try to use numexpr (default True)
         """
-    use_numexpr = use_numexpr and _bool_arith_check(op_str, a, b)
-    if use_numexpr:
+    if use_numexpr := use_numexpr and _bool_arith_check(op_str, a, b):
         return _evaluate(op, op_str, a, b, raise_on_error=raise_on_error,
                          **eval_kwargs)
     return _evaluate_standard(op, op_str, a, b, raise_on_error=raise_on_error)

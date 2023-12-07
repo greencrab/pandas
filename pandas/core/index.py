@@ -453,11 +453,7 @@ class Index(IndexOpsMixin, PandasObject):
         if data is None:
             data = ''
 
-        res = u("%s(%s%s)") % (klass,
-                               data,
-                               prepr)
-
-        return res
+        return u("%s(%s%s)") % (klass, data, prepr)
 
     def _format_space(self):
 
@@ -494,7 +490,10 @@ class Index(IndexOpsMixin, PandasObject):
         formatter = self._formatter_func
 
         # do we want to justify (only do so for non-objects)
-        is_justify = not (self.inferred_type == 'string' or self.inferred_type == 'categorical' and is_object_dtype(self.categories))
+        is_justify = self.inferred_type != 'string' and (
+            self.inferred_type != 'categorical'
+            or not is_object_dtype(self.categories)
+        )
 
         # are we a truncated display
         is_truncated = n > max_seq_items
@@ -508,20 +507,17 @@ class Index(IndexOpsMixin, PandasObject):
             return s, line
 
         def best_len(values):
-            if values:
-                return max([len(x) for x in values])
-            else:
-                return 0
+            return max(len(x) for x in values) if values else 0
 
         if n == 0:
             summary = '[], '
         elif n == 1:
             first = formatter(self[0])
-            summary = '[%s], ' % first
+            summary = f'[{first}], '
         elif n == 2:
             first = formatter(self[0])
             last = formatter(self[-1])
-            summary = '[%s, %s], ' % (first, last)
+            summary = f'[{first}, {last}], '
         else:
 
             if n > max_seq_items:
@@ -536,7 +532,11 @@ class Index(IndexOpsMixin, PandasObject):
             if is_justify:
 
                 # however, if we are not truncated and we are only a single line, then don't justify
-                if is_truncated or not (len(', '.join(head)) < display_width and len(', '.join(tail)) < display_width):
+                if (
+                    is_truncated
+                    or len(', '.join(head)) >= display_width
+                    or len(', '.join(tail)) >= display_width
+                ):
                     max_len = max(best_len(head), best_len(tail))
                     head = [x.rjust(max_len) for x in head]
                     tail = [x.rjust(max_len) for x in tail]
@@ -563,11 +563,7 @@ class Index(IndexOpsMixin, PandasObject):
             summary += line
             summary += '],'
 
-            if len(summary) > (display_width):
-                summary += space1
-            else:  # one row
-                summary += ' '
-
+            summary += space1 if len(summary) > (display_width) else ' '
             # remove initial space
             summary = '[' + summary[len(space2):]
 
@@ -577,8 +573,7 @@ class Index(IndexOpsMixin, PandasObject):
         """
         Return a list of tuples of the (attr,formatted_value)
         """
-        attrs = []
-        attrs.append(('dtype',"'%s'" % self.dtype))
+        attrs = [('dtype', f"'{self.dtype}'")]
         if self.name is not None:
             attrs.append(('name',default_pprint(self.name)))
         max_seq_items = get_option('display.max_seq_items') or len(self)
@@ -618,13 +613,12 @@ class Index(IndexOpsMixin, PandasObject):
         conversion to DatetimeIndex
         """
         from pandas.tseries.index import DatetimeIndex
-        if self.inferred_type == 'string':
-            from dateutil.parser import parse
-            parser = lambda x: parse(x, dayfirst=dayfirst)
-            parsed = lib.try_parse_dates(self.values, parser=parser)
-            return DatetimeIndex(parsed)
-        else:
+        if self.inferred_type != 'string':
             return DatetimeIndex(self.values)
+        from dateutil.parser import parse
+        parser = lambda x: parse(x, dayfirst=dayfirst)
+        parsed = lib.try_parse_dates(self.values, parser=parser)
+        return DatetimeIndex(parsed)
 
     def _assert_can_do_setop(self, other):
         if not com.is_list_like(other):
@@ -704,10 +698,7 @@ class Index(IndexOpsMixin, PandasObject):
         if level is not None and not is_list_like(level):
             level = [level]
 
-        if inplace:
-            idx = self
-        else:
-            idx = self._shallow_copy()
+        idx = self if inplace else self._shallow_copy()
         idx._set_names(names, level=level)
         if not inplace:
             return idx
@@ -738,20 +729,19 @@ class Index(IndexOpsMixin, PandasObject):
         if len(self) > 0:
             head = self[0]
             if hasattr(head, 'format') and\
-               not isinstance(head, compat.string_types):
+                   not isinstance(head, compat.string_types):
                 head = head.format()
             tail = self[-1]
             if hasattr(tail, 'format') and\
-               not isinstance(tail, compat.string_types):
+                   not isinstance(tail, compat.string_types):
                 tail = tail.format()
-            index_summary = ', %s to %s' % (com.pprint_thing(head),
-                                            com.pprint_thing(tail))
+            index_summary = f', {com.pprint_thing(head)} to {com.pprint_thing(tail)}'
         else:
             index_summary = ''
 
         if name is None:
             name = type(self).__name__
-        return '%s: %s entries%s' % (name, len(self), index_summary)
+        return f'{name}: {len(self)} entries{index_summary}'
 
     def _mpl_repr(self):
         # how to represent ourselves to matplotlib
@@ -832,9 +822,7 @@ class Index(IndexOpsMixin, PandasObject):
 
         def to_int():
             ikey = int(key)
-            if ikey != key:
-                return self._invalid_indexer('label', key)
-            return ikey
+            return self._invalid_indexer('label', key) if ikey != key else ikey
 
         if kind == 'iloc':
             if is_integer(key):
@@ -899,14 +887,10 @@ class Index(IndexOpsMixin, PandasObject):
             if v is None or is_integer(v):
                 return True
 
-            # dissallow floats (except for .ix)
             elif is_float(v):
-                if kind == 'ix':
-                    return True
-
-                return False
-
+                return kind == 'ix'
             return True
+
         for c in ['start','stop','step']:
             v = getattr(key,c)
             if not validate(v):
@@ -977,7 +961,7 @@ class Index(IndexOpsMixin, PandasObject):
                 from pandas.core.indexing import _maybe_convert_indices
                 return _maybe_convert_indices(indexer, len(self))
 
-            elif not self.inferred_type == 'integer':
+            elif self.inferred_type != 'integer':
                 return keyarr
 
         return None
@@ -1024,8 +1008,7 @@ class Index(IndexOpsMixin, PandasObject):
                                  " Index has only 1 level, not %d" %
                                  (level + 1))
         elif level != self.name:
-            raise KeyError('Level %s must be same as name (%s)'
-                           % (level, self.name))
+            raise KeyError(f'Level {level} must be same as name ({self.name})')
 
     def _get_level_number(self, level):
         self._validate_index_level(level)
@@ -1132,10 +1115,7 @@ class Index(IndexOpsMixin, PandasObject):
 
         key = _values_from_object(key)
         result = getitem(key)
-        if not np.isscalar(result):
-            return promote(result)
-        else:
-            return result
+        return promote(result) if not np.isscalar(result) else result
 
     def _ensure_compat_append(self, other):
         """
@@ -1149,7 +1129,7 @@ class Index(IndexOpsMixin, PandasObject):
         to_concat = [self]
 
         if isinstance(other, (list, tuple)):
-            to_concat = to_concat + list(other)
+            to_concat += list(other)
         else:
             to_concat.append(other)
 
@@ -1342,10 +1322,7 @@ class Index(IndexOpsMixin, PandasObject):
 
         sorted_index = self.take(_as)
 
-        if return_indexer:
-            return sorted_index, _as
-        else:
-            return sorted_index
+        return (sorted_index, _as) if return_indexer else sorted_index
 
     def order(self, return_indexer=False, ascending=True):
         """
@@ -1793,7 +1770,7 @@ class Index(IndexOpsMixin, PandasObject):
             raise InvalidIndexError('Reindexing only valid with uniquely'
                                     ' valued Index objects')
 
-        if method == 'pad' or method == 'backfill':
+        if method in ['pad', 'backfill']:
             indexer = self._get_fill_indexer(target, method, limit, tolerance)
         elif method == 'nearest':
             indexer = self._get_nearest_indexer(target, limit, tolerance)
@@ -2017,25 +1994,24 @@ class Index(IndexOpsMixin, PandasObject):
         else:
             target = _ensure_index(target)
 
-        if level is not None:
-            if method is not None:
-                raise TypeError('Fill method not supported if level passed')
-            _, indexer, _ = self._join_level(target, level, how='right',
-                                             return_indexers=True)
-        else:
+        if level is None:
             if self.equals(target):
                 indexer = None
-            else:
-                if self.is_unique:
-                    indexer = self.get_indexer(target, method=method,
-                                               limit=limit,
-                                               tolerance=tolerance)
-                else:
-                    if method is not None or limit is not None:
-                        raise ValueError("cannot reindex a non-unique index "
-                                         "with a method or limit")
-                    indexer, missing = self.get_indexer_non_unique(target)
+            elif self.is_unique:
+                indexer = self.get_indexer(target, method=method,
+                                           limit=limit,
+                                           tolerance=tolerance)
+            elif method is None and limit is None:
+                indexer, missing = self.get_indexer_non_unique(target)
 
+            else:
+                raise ValueError("cannot reindex a non-unique index "
+                                 "with a method or limit")
+        elif method is not None:
+            raise TypeError('Fill method not supported if level passed')
+        else:
+            _, indexer, _ = self._join_level(target, level, how='right',
+                                             return_indexers=True)
         if preserve_names and target.nlevels == 1 and target.name != self.name:
             target = target.copy()
             target.name = self.name
@@ -2077,7 +2053,7 @@ class Index(IndexOpsMixin, PandasObject):
             cur_labels = self.take(indexer[check]).values
             cur_indexer = com._ensure_int64(l[check])
 
-            new_labels = np.empty(tuple([len(indexer)]), dtype=object)
+            new_labels = np.empty((len(indexer), ), dtype=object)
             new_labels[cur_indexer] = cur_labels
             new_labels[missing_indexer] = missing_labels
 
@@ -2129,9 +2105,7 @@ class Index(IndexOpsMixin, PandasObject):
         if (level is None and (self_is_mi or other_is_mi)):
 
             # have the same levels/names so a simple join
-            if self.names == other.names:
-                pass
-            else:
+            if self.names != other.names:
                 return self._join_multi(other, how=how, return_indexers=return_indexers)
 
         # join on the level
@@ -2143,20 +2117,18 @@ class Index(IndexOpsMixin, PandasObject):
 
         if len(other) == 0 and how in ('left', 'outer'):
             join_index = self._shallow_copy()
-            if return_indexers:
-                rindexer = np.repeat(-1, len(join_index))
-                return join_index, None, rindexer
-            else:
+            if not return_indexers:
                 return join_index
 
+            rindexer = np.repeat(-1, len(join_index))
+            return join_index, None, rindexer
         if len(self) == 0 and how in ('right', 'outer'):
             join_index = other._shallow_copy()
-            if return_indexers:
-                lindexer = np.repeat(-1, len(join_index))
-                return join_index, lindexer, None
-            else:
+            if not return_indexers:
                 return join_index
 
+            lindexer = np.repeat(-1, len(join_index))
+            return join_index, lindexer, None
         if self._join_precedence < other._join_precedence:
             how = {'right': 'left', 'left': 'right'}.get(how, how)
             result = other.join(self, how=how, level=level,
@@ -2200,18 +2172,11 @@ class Index(IndexOpsMixin, PandasObject):
         elif how == 'outer':
             join_index = self.union(other)
 
-        if return_indexers:
-            if join_index is self:
-                lindexer = None
-            else:
-                lindexer = self.get_indexer(join_index)
-            if join_index is other:
-                rindexer = None
-            else:
-                rindexer = other.get_indexer(join_index)
-            return join_index, lindexer, rindexer
-        else:
+        if not return_indexers:
             return join_index
+        lindexer = None if join_index is self else self.get_indexer(join_index)
+        rindexer = None if join_index is other else other.get_indexer(join_index)
+        return join_index, lindexer, rindexer
 
     def _join_multi(self, other, how, return_indexers=True):
 
@@ -2267,10 +2232,7 @@ class Index(IndexOpsMixin, PandasObject):
 
         join_index = self._wrap_joined_index(join_index, other)
 
-        if return_indexers:
-            return join_index, left_idx, right_idx
-        else:
-            return join_index
+        return (join_index, left_idx, right_idx) if return_indexers else join_index
 
     def _join_level(self, other, level, how='left',
                     return_indexers=False,
@@ -2403,11 +2365,7 @@ class Index(IndexOpsMixin, PandasObject):
     def _join_monotonic(self, other, how='left', return_indexers=False):
         if self.equals(other):
             ret_index = other if how == 'right' else self
-            if return_indexers:
-                return ret_index, None, None
-            else:
-                return ret_index
-
+            return (ret_index, None, None) if return_indexers else ret_index
         sv = self.values
         ov = other.values
 
@@ -2438,10 +2396,7 @@ class Index(IndexOpsMixin, PandasObject):
                 join_index, lidx, ridx = self._outer_indexer(sv, ov)
             join_index = self._wrap_joined_index(join_index, other)
 
-        if return_indexers:
-            return join_index, lidx, ridx
-        else:
-            return join_index
+        return (join_index, lidx, ridx) if return_indexers else join_index
 
     def _wrap_joined_index(self, joined, other):
         name = self.name if self.name == other.name else None
@@ -2570,21 +2525,15 @@ class Index(IndexOpsMixin, PandasObject):
                 slc = lib.maybe_booleans_to_slice(slc.view('u1'))
             else:
                 slc = lib.maybe_indices_to_slice(slc.astype('i8'), len(self))
-            if isinstance(slc, np.ndarray):
-                raise KeyError(
-                    "Cannot get %s slice bound for non-unique label:"
-                    " %r" % (side, original_label))
+        if isinstance(slc, np.ndarray):
+            raise KeyError(
+                "Cannot get %s slice bound for non-unique label:"
+                " %r" % (side, original_label))
 
         if isinstance(slc, slice):
-            if side == 'left':
-                return slc.start
-            else:
-                return slc.stop
+            return slc.start if side == 'left' else slc.stop
         else:
-            if side == 'right':
-                return slc + 1
-            else:
-                return slc
+            return slc + 1 if side == 'right' else slc
 
     def slice_locs(self, start=None, end=None, step=None, kind=None):
         """
@@ -2617,9 +2566,7 @@ class Index(IndexOpsMixin, PandasObject):
         if start_slice is None:
             start_slice = 0
 
-        end_slice = None
-        if end is not None:
-            end_slice = self.get_slice_bound(end, 'right', kind)
+        end_slice = None if end is None else self.get_slice_bound(end, 'right', kind)
         if end_slice is None:
             end_slice = len(self)
 
@@ -2702,7 +2649,7 @@ class Index(IndexOpsMixin, PandasObject):
         mask = indexer == -1
         if mask.any():
             if errors != 'ignore':
-                raise ValueError('labels %s not contained in axis' % labels[mask])
+                raise ValueError(f'labels {labels[mask]} not contained in axis')
             indexer = indexer[~mask]
         return self.delete(indexer)
 
@@ -2952,20 +2899,14 @@ class CategoricalIndex(Index, PandasDelegate):
             return cls._simple_new(data, name=name)
 
         if isinstance(data, ABCCategorical):
-            data = cls._create_categorical(cls, data, categories, ordered)
+            pass
         elif isinstance(data, CategoricalIndex):
             data = data._data
-            data = cls._create_categorical(cls, data, categories, ordered)
-        else:
-
-            # don't allow scalars
-            # if data is None, then categories must be provided
-            if lib.isscalar(data):
-                if data is not None or categories is None:
-                    cls._scalar_data_error(data)
-                data = []
-            data = cls._create_categorical(cls, data, categories, ordered)
-
+        elif lib.isscalar(data):
+            if data is not None or categories is None:
+                cls._scalar_data_error(data)
+            data = []
+        data = cls._create_categorical(cls, data, categories, ordered)
         if copy:
             data = data.copy()
 
@@ -3093,7 +3034,7 @@ class CategoricalIndex(Index, PandasDelegate):
                  ('ordered',self.ordered)]
         if self.name is not None:
             attrs.append(('name',default_pprint(self.name)))
-        attrs.append(('dtype',"'%s'" % self.dtype))
+        attrs.append(('dtype', f"'{self.dtype}'"))
         max_seq_items = get_option('display.max_seq_items') or len(self)
         if len(self) > max_seq_items:
             attrs.append(('length',len(self)))
@@ -3282,7 +3223,7 @@ class CategoricalIndex(Index, PandasDelegate):
         if isinstance(target, CategoricalIndex):
             target = target.categories
 
-        if method == 'pad' or method == 'backfill':
+        if method in ['pad', 'backfill']:
             raise NotImplementedError("method='pad' and method='backfill' not implemented yet "
                                       'for CategoricalIndex')
         elif method == 'nearest':
@@ -3428,9 +3369,7 @@ class CategoricalIndex(Index, PandasDelegate):
         if 'inplace' in kwargs:
             raise ValueError("cannot use inplace with CategoricalIndex")
         res = method(*args, **kwargs)
-        if lib.isscalar(res):
-            return res
-        return CategoricalIndex(res, name=self.name)
+        return res if lib.isscalar(res) else CategoricalIndex(res, name=self.name)
 
     @classmethod
     def _add_accessors(cls):
@@ -3857,10 +3796,7 @@ class MultiIndex(Index):
         if len(levels) == 0:
             raise ValueError('Must pass non-zero number of levels/labels')
         if len(levels) == 1:
-            if names:
-                name = names[0]
-            else:
-                name = None
+            name = names[0] if names else None
             return Index(levels[0], name=name, copy=True).take(labels[0])
 
         result = object.__new__(MultiIndex)
@@ -3873,11 +3809,7 @@ class MultiIndex(Index):
             # handles name validation
             result._set_names(names)
 
-        if sortorder is not None:
-            result.sortorder = int(sortorder)
-        else:
-            result.sortorder = sortorder
-
+        result.sortorder = int(sortorder) if sortorder is not None else sortorder
         if verify_integrity:
             result._verify_integrity()
         if _set_identity:
@@ -3897,8 +3829,7 @@ class MultiIndex(Index):
         label_length = len(self.labels[0])
         for i, (level, label) in enumerate(zip(levels, labels)):
             if len(label) != label_length:
-                raise ValueError("Unequal label lengths: %s" % (
-                                 [len(lab) for lab in labels]))
+                raise ValueError(f"Unequal label lengths: {[len(lab) for lab in labels]}")
             if len(label) and label.max() >= len(level):
                 raise ValueError("On level %d, label max (%d) >= length of"
                                  " level  (%d). NOTE: this index is in an"
@@ -3995,10 +3926,7 @@ class MultiIndex(Index):
             if not is_list_like(levels) or not is_list_like(levels[0]):
                 raise TypeError("Levels must be list of lists-like")
 
-        if inplace:
-            idx = self
-        else:
-            idx = self._shallow_copy()
+        idx = self if inplace else self._shallow_copy()
         idx._reset_identity()
         idx._set_levels(levels, level=level, validate=True,
                         verify_integrity=verify_integrity)
@@ -4093,10 +4021,7 @@ class MultiIndex(Index):
             if not is_list_like(labels) or not is_list_like(labels[0]):
                 raise TypeError("Labels must be list of lists-like")
 
-        if inplace:
-            idx = self
-        else:
-            idx = self._shallow_copy()
+        idx = self if inplace else self._shallow_copy()
         idx._reset_identity()
         idx._set_labels(labels, level=level, verify_integrity=verify_integrity)
         if not inplace:
@@ -4183,7 +4108,7 @@ class MultiIndex(Index):
         """
         attrs = [('levels', default_pprint(self._levels, max_seq_items=False)),
                  ('labels', default_pprint(self._labels, max_seq_items=False))]
-        if not all(name is None for name in self.names):
+        if any(name is not None for name in self.names):
             attrs.append(('names', default_pprint(self.names)))
         if self.sortorder is not None:
             attrs.append(('sortorder', default_pprint(self.sortorder)))
@@ -4262,7 +4187,7 @@ class MultiIndex(Index):
             level = self.names.index(level)
         except ValueError:
             if not isinstance(level, int):
-                raise KeyError('Level %s not found' % str(level))
+                raise KeyError(f'Level {str(level)} not found')
             elif level < 0:
                 level += self.nlevels
                 if level < 0:
@@ -4271,7 +4196,6 @@ class MultiIndex(Index):
                         'Too many levels: Index has only %d levels, '
                         '%d is not a valid level number' % (self.nlevels, orig_level)
                     )
-            # Note: levels are zero-based
             elif level >= self.nlevels:
                 raise IndexError('Too many levels: Index has only %d levels, '
                                  'not %d' % (self.nlevels, level + 1))
@@ -4454,12 +4378,7 @@ class MultiIndex(Index):
             sparsify = get_option("display.multi_sparse")
 
         if sparsify:
-            sentinel = ''
-            # GH3547
-            # use value of sparsify as sentinel,  unless it's an obvious
-            # "Truthey" value
-            if sparsify not in [True, 1]:
-                sentinel = sparsify
+            sentinel = sparsify if sparsify not in [True, 1] else ''
             # little bit of a kludge job for #1217
             result_levels = _sparsify(result_levels,
                                       start=int(names),
@@ -4527,17 +4446,16 @@ class MultiIndex(Index):
     @cache_readonly
     def lexsort_depth(self):
         if self.sortorder is not None:
-            if self.sortorder == 0:
-                return self.nlevels
-            else:
-                return 0
-
+            return self.nlevels if self.sortorder == 0 else 0
         int64_labels = [com._ensure_int64(lab) for lab in self.labels]
-        for k in range(self.nlevels, 0, -1):
-            if lib.is_lexsorted(int64_labels[:k]):
-                return k
-
-        return 0
+        return next(
+            (
+                k
+                for k in range(self.nlevels, 0, -1)
+                if lib.is_lexsorted(int64_labels[:k])
+            ),
+            0,
+        )
 
     @classmethod
     def from_arrays(cls, arrays, sortorder=None, names=None):
@@ -4692,10 +4610,12 @@ class MultiIndex(Index):
 
     def __reduce__(self):
         """Necessary for making this object picklable"""
-        d = dict(levels = [lev for lev in self.levels],
-                 labels = [label for label in self.labels],
-                 sortorder = self.sortorder,
-                 names = list(self.names))
+        d = dict(
+            levels=list(self.levels),
+            labels=list(self.labels),
+            sortorder=self.sortorder,
+            names=list(self.names),
+        )
         return _new_Index, (self.__class__, d), None
 
     def __setstate__(self, state):
@@ -4817,8 +4737,7 @@ class MultiIndex(Index):
             mask = indexer == -1
             if mask.any():
                 if errors != 'ignore':
-                    raise ValueError('labels %s not contained in axis'
-                                     % labels[mask])
+                    raise ValueError(f'labels {labels[mask]} not contained in axis')
                 indexer = indexer[~mask]
         except Exception:
             pass
@@ -4879,19 +4798,17 @@ class MultiIndex(Index):
             new_labels.pop(i)
             new_names.pop(i)
 
-        if len(new_levels) == 1:
-
-            # set nan if needed
-            mask = new_labels[0] == -1
-            result = new_levels[0].take(new_labels[0])
-            if mask.any():
-                result = result.putmask(mask, np.nan)
-
-            result.name = new_names[0]
-            return result
-        else:
+        if len(new_levels) != 1:
             return MultiIndex(levels=new_levels, labels=new_labels,
                               names=new_names, verify_integrity=False)
+        # set nan if needed
+        mask = new_labels[0] == -1
+        result = new_levels[0].take(new_labels[0])
+        if mask.any():
+            result = result.putmask(mask, np.nan)
+
+        result.name = new_names[0]
+        return result
 
     def swaplevel(self, i, j):
         """

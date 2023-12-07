@@ -7,8 +7,7 @@ import pandas.stats.moments as m
 
 def test_series(n=1000):
     t.N = n
-    s = t.makeTimeSeries()
-    return s
+    return t.makeTimeSeries()
 
 
 def plot_timeseries(*args, **kwds):

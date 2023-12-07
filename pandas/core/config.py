@@ -88,9 +88,7 @@ def _get_single_key(pat, silent):
     if not silent:
         _warn_if_deprecated(key)
 
-    key = _translate_key(key)
-
-    return key
+    return _translate_key(key)
 
 
 def _get_option(pat, silent=False):
@@ -194,10 +192,7 @@ class DictWrapper(object):
             prefix += "."
         prefix += key
         v = object.__getattribute__(self, "d")[key]
-        if isinstance(v, dict):
-            return DictWrapper(v, prefix)
-        else:
-            return _get_option(prefix)
+        return DictWrapper(v, prefix) if isinstance(v, dict) else _get_option(prefix)
 
     def __dir__(self):
         return list(self.d.keys())
@@ -383,7 +378,7 @@ class option_context(object):
     """
 
     def __init__(self, *args):
-        if not (len(args) % 2 == 0 and len(args) >= 2):
+        if len(args) % 2 != 0 or len(args) < 2:
             raise ValueError(
                 'Need to invoke as'
                 'option_context(pat, val, [(pat, val), ...)).'
@@ -392,10 +387,7 @@ class option_context(object):
         self.ops = list(zip(args[::2], args[1::2]))
 
     def __enter__(self):
-        undo = []
-        for pat, val in self.ops:
-            undo.append((pat, _get_option(pat, silent=True)))
-
+        undo = [(pat, _get_option(pat, silent=True)) for pat, val in self.ops]
         self.undo = undo
 
         for pat, val in self.ops:
@@ -435,9 +427,9 @@ def register_option(key, defval, doc='', validator=None, cb=None):
     key = key.lower()
 
     if key in _registered_options:
-        raise OptionError("Option '%s' has already been registered" % key)
+        raise OptionError(f"Option '{key}' has already been registered")
     if key in _reserved_keys:
-        raise OptionError("Option '%s' is a reserved key" % key)
+        raise OptionError(f"Option '{key}' is a reserved key")
 
     # the default value should be legal
     if validator:
@@ -448,22 +440,24 @@ def register_option(key, defval, doc='', validator=None, cb=None):
 
     for k in path:
         if not bool(re.match('^' + tokenize.Name + '$', k)):
-            raise ValueError("%s is not a valid identifier" % k)
+            raise ValueError(f"{k} is not a valid identifier")
         if keyword.iskeyword(k):
-            raise ValueError("%s is a python keyword" % k)
+            raise ValueError(f"{k} is a python keyword")
 
     cursor = _global_config
     for i, p in enumerate(path[:-1]):
         if not isinstance(cursor, dict):
-            raise OptionError("Path prefix to option '%s' is already an option"
-                              % '.'.join(path[:i]))
+            raise OptionError(
+                f"Path prefix to option '{'.'.join(path[:i])}' is already an option"
+            )
         if p not in cursor:
             cursor[p] = {}
         cursor = cursor[p]
 
     if not isinstance(cursor, dict):
-        raise OptionError("Path prefix to option '%s' is already an option"
-                          % '.'.join(path[:-1]))
+        raise OptionError(
+            f"Path prefix to option '{'.'.join(path[:-1])}' is already an option"
+        )
 
     cursor[path[-1]] = defval  # initialize
 
@@ -515,8 +509,7 @@ def deprecate_option(key, msg=None, rkey=None, removal_ver=None):
     key = key.lower()
 
     if key in _deprecated_options:
-        raise OptionError("Option '%s' has already been defined as deprecated."
-                          % key)
+        raise OptionError(f"Option '{key}' has already been defined as deprecated.")
 
     _deprecated_options[key] = DeprecatedOption(key, msg, rkey, removal_ver)
 
@@ -536,10 +529,7 @@ def _select_options(pat):
 
     # else look through all of them
     keys = sorted(_registered_options.keys())
-    if pat == 'all':  # reserved key
-        return keys
-
-    return [k for k in keys if re.search(pat, k, re.I)]
+    return keys if pat == 'all' else [k for k in keys if re.search(pat, k, re.I)]
 
 
 def _get_root(key):
@@ -591,11 +581,7 @@ def _translate_key(key):
     replacement key, otherwise returns `key` as - is
     """
 
-    d = _get_deprecated_option(key)
-    if d:
-        return d.rkey or key
-    else:
-        return key
+    return d.rkey or key if (d := _get_deprecated_option(key)) else key
 
 
 def _warn_if_deprecated(key):
@@ -607,23 +593,22 @@ def _warn_if_deprecated(key):
     bool - True if `key` is deprecated, False otherwise.
     """
 
-    d = _get_deprecated_option(key)
-    if d:
-        if d.msg:
-            print(d.msg)
-            warnings.warn(d.msg, DeprecationWarning)
+    if not (d := _get_deprecated_option(key)):
+        return False
+    if d.msg:
+        print(d.msg)
+        warnings.warn(d.msg, DeprecationWarning)
+    else:
+        msg = f"'{key}' is deprecated"
+        if d.removal_ver:
+            msg += f' and will be removed in {d.removal_ver}'
+        if d.rkey:
+            msg += f", please use '{d.rkey}' instead."
         else:
-            msg = "'%s' is deprecated" % key
-            if d.removal_ver:
-                msg += ' and will be removed in %s' % d.removal_ver
-            if d.rkey:
-                msg += ", please use '%s' instead." % d.rkey
-            else:
-                msg += ', please refrain from using it.'
+            msg += ', please refrain from using it.'
 
-            warnings.warn(msg, DeprecationWarning)
-        return True
-    return False
+        warnings.warn(msg, DeprecationWarning)
+    return True
 
 
 def _build_option_description(k):
@@ -719,7 +704,7 @@ def config_prefix(prefix):
     def wrap(func):
 
         def inner(key, *args, **kwds):
-            pkey = '%s.%s' % (prefix, key)
+            pkey = f'{prefix}.{key}'
             return func(pkey, *args, **kwds)
 
         return inner
@@ -755,7 +740,7 @@ def is_type_factory(_type):
 
     def inner(x):
         if type(x) != _type:
-            raise ValueError("Value must have type '%s'" % str(_type))
+            raise ValueError(f"Value must have type '{str(_type)}'")
 
     return inner
 
@@ -778,11 +763,11 @@ def is_instance_factory(_type):
         from pandas.core.common import pprint_thing
         type_repr = "|".join(map(pprint_thing, _type))
     else:
-        type_repr = "'%s'" % _type
+        type_repr = f"'{_type}'"
 
     def inner(x):
         if not isinstance(x, _type):
-            raise ValueError("Value must be an instance of %s" % type_repr)
+            raise ValueError(f"Value must be an instance of {type_repr}")
 
     return inner
 
@@ -790,10 +775,9 @@ def is_instance_factory(_type):
 def is_one_of_factory(legal_values):
     def inner(x):
         from pandas.core.common import pprint_thing as pp
-        if not x in legal_values:
+        if x not in legal_values:
             pp_values = lmap(pp, legal_values)
-            raise ValueError("Value must be one of %s"
-                             % pp("|".join(pp_values)))
+            raise ValueError(f'Value must be one of {pp("|".join(pp_values))}')
 
     return inner
 

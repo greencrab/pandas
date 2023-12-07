@@ -25,7 +25,7 @@ class replace_large_dict(object):
     def setup(self):
         self.n = (10 ** 6)
         self.start_value = (10 ** 5)
-        self.to_rep = dict(((i, (self.start_value + i)) for i in range(self.n)))
+        self.to_rep = {i: self.start_value + i for i in range(self.n)}
         self.s = Series(np.random.randint(self.n, size=(10 ** 3)))
 
     def time_replace_large_dict(self):

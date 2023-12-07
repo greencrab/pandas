@@ -49,10 +49,7 @@ def mangle_docstrings(app, what, name, obj, options, lines,
         lines[:] = title_re.sub(sixu(''), sixu("\n").join(lines)).split(sixu("\n"))
     else:
         doc = get_doc_object(obj, what, sixu("\n").join(lines), config=cfg)
-        if sys.version_info[0] >= 3:
-            doc = str(doc)
-        else:
-            doc = unicode(doc)
+        doc = str(doc) if sys.version_info[0] >= 3 else unicode(doc)
         lines[:] = doc.split(sixu("\n"))
 
     if app.config.numpydoc_edit_link and hasattr(obj, '__name__') and \
@@ -69,8 +66,7 @@ def mangle_docstrings(app, what, name, obj, options, lines,
     references = []
     for line in lines:
         line = line.strip()
-        m = re.match(sixu('^.. \\[([a-z0-9_.-])\\]'), line, re.I)
-        if m:
+        if m := re.match(sixu('^.. \\[([a-z0-9_.-])\\]'), line, re.I):
             references.append(m.group(1))
 
     # start renaming from the longest string, to avoid overwriting parts
