@@ -60,7 +60,7 @@ with open("index.rst") as f:
 # JP: added from sphinxdocs
 autosummary_generate = False
 
-if any([re.match("\s*api\s*",l) for l in index_rst_lines]):
+if any(re.match("\s*api\s*", l) for l in index_rst_lines):
     autosummary_generate = True
 
 files_to_delete = []
@@ -69,29 +69,23 @@ for f in os.listdir(os.path.dirname(__file__)):
         continue
 
     _file_basename = f.split('.rst')[0]
-    _regex_to_match = "\s*{}\s*$".format(_file_basename)
-    if not any([re.match(_regex_to_match, line) for line in index_rst_lines]):
+    _regex_to_match = f"\s*{_file_basename}\s*$"
+    if not any(re.match(_regex_to_match, line) for line in index_rst_lines):
         files_to_delete.append(f)
 
 if files_to_delete:
     print("I'm about to DELETE the following:\n%s\n" % list(sorted(files_to_delete)))
     sys.stdout.write("WARNING: I'd like to delete those to speed up processing (yes/no)? ")
-    if PY3:
-        answer = input()
-    else:
-        answer = raw_input()
-
+    answer = input() if PY3 else raw_input()
     if answer.lower().strip() in ('y','yes'):
         for f in files_to_delete:
             f = os.path.join(os.path.join(os.path.dirname(__file__),f))
             f= os.path.abspath(f)
             try:
-                print("Deleting %s" % f)
+                print(f"Deleting {f}")
                 os.unlink(f)
             except:
-                print("Error deleting %s" % f)
-                pass
-
+                print(f"Error deleting {f}")
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['../_templates']
 
@@ -116,7 +110,7 @@ copyright = u('2008-2014, the pandas development team')
 import pandas
 
 # version = '%s r%s' % (pandas.__version__, svn_version())
-version = '%s' % (pandas.__version__)
+version = f'{pandas.__version__}'
 
 # The full version, including alpha/beta/rc tags.
 release = version

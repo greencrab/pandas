@@ -75,7 +75,7 @@ class concat_series_axis1(object):
         self.indices = tm.makeStringIndex(1000)
         self.s = Series(self.n, index=self.indices)
         self.pieces = [self.s[i:(- i)] for i in range(1, 10)]
-        self.pieces = (self.pieces * 50)
+        self.pieces *= 50
 
     def time_concat_series_axis1(self):
         concat(self.pieces, axis=1)

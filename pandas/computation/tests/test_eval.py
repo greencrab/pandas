@@ -192,9 +192,9 @@ class TestEvalNumexprPandas(tm.TestCase):
         ex = '(lhs {cmp1} rhs) {binop} (lhs {cmp2} rhs)'.format(cmp1=cmp1,
                                                                 binop=binop,
                                                                 cmp2=cmp2)
-        scalar_with_in_notin = (np.isscalar(rhs) and (cmp1 in skip_these or
-                                cmp2 in skip_these))
-        if scalar_with_in_notin:
+        if scalar_with_in_notin := (
+            np.isscalar(rhs) and (cmp1 in skip_these or cmp2 in skip_these)
+        ):
             with tm.assertRaises(TypeError):
                 pd.eval(ex, engine=self.engine, parser=self.parser)
             self.assertRaises(TypeError, pd.eval, ex, engine=self.engine,
@@ -203,20 +203,11 @@ class TestEvalNumexprPandas(tm.TestCase):
         else:
             lhs_new = _eval_single_bin(lhs, cmp1, rhs, self.engine)
             rhs_new = _eval_single_bin(lhs, cmp2, rhs, self.engine)
-            if (isinstance(lhs_new, Series) and isinstance(rhs_new, DataFrame)
-                    and binop in _series_frame_incompatible):
-                pass
-                # TODO: the code below should be added back when left and right
-                # hand side bool ops are fixed.
-
-                # try:
-                    # self.assertRaises(Exception, pd.eval, ex,
-                                    #local_dict={'lhs': lhs, 'rhs': rhs},
-                                    # engine=self.engine, parser=self.parser)
-                # except AssertionError:
-                    #import ipdb; ipdb.set_trace()
-                    # raise
-            else:
+            if (
+                not isinstance(lhs_new, Series)
+                or not isinstance(rhs_new, DataFrame)
+                or binop not in _series_frame_incompatible
+            ):
                 expected = _eval_single_bin(
                     lhs_new, binop, rhs_new, self.engine)
                 result = pd.eval(ex, engine=self.engine, parser=self.parser)
@@ -309,13 +300,12 @@ class TestEvalNumexprPandas(tm.TestCase):
 
             emsg = u(emsg)
 
-            if emsg == msg:
-                if self.engine == 'python':
-                    raise nose.SkipTest(emsg)
-                else:
-                    expected = np.nan
-            else:
+            if emsg != msg:
                 raise
+            if self.engine == 'python':
+                raise nose.SkipTest(emsg)
+            else:
+                expected = np.nan
         return expected
 
     def check_pow(self, lhs, arith1, rhs):
@@ -365,10 +355,7 @@ class TestEvalNumexprPandas(tm.TestCase):
             if np.isscalar(lhs) and np.isscalar(rhs):
                 lhs, rhs = map(lambda x: np.array([x]), (lhs, rhs))
             expected = _eval_single_bin(lhs, cmp1, rhs, self.engine)
-            if np.isscalar(expected):
-                expected = not expected
-            else:
-                expected = ~expected
+            expected = not expected if np.isscalar(expected) else ~expected
             result = pd.eval(ex, engine=self.engine, parser=self.parser)
             tm.assert_numpy_array_equal(expected, result)
 
@@ -945,22 +932,14 @@ class TestAlignment(object):
                 index = getattr(locals().get(obj_name), index_name)
                 s = Series(np.random.randn(n), index[:n])
 
-                if r2 == 'dt' or c2 == 'dt':
-                    if engine == 'numexpr':
-                        expected2 = df2.add(s)
-                    else:
-                        expected2 = df2 + s
+                if (r2 == 'dt' or c2 == 'dt') and engine == 'numexpr':
+                    expected2 = df2.add(s)
                 else:
                     expected2 = df2 + s
-
-                if r1 == 'dt' or c1 == 'dt':
-                    if engine == 'numexpr':
-                        expected = expected2.add(df)
-                    else:
-                        expected = expected2 + df
+                if (r1 == 'dt' or c1 == 'dt') and engine == 'numexpr':
+                    expected = expected2.add(df)
                 else:
                     expected = expected2 + df
-
                 if should_warn(df2.index, s.index, df.index):
                     with tm.assert_produces_warning(RuntimeWarning):
                         res = pd.eval('df2 + s + df', engine=engine,
@@ -979,11 +958,7 @@ class TestAlignment(object):
         tm.skip_if_no_ne(engine)
         df = DataFrame(randn(1000, 10))
         s = Series(randn(10000))
-        if engine == 'numexpr':
-            seen = pd.io.common.PerformanceWarning
-        else:
-            seen = False
-
+        seen = pd.io.common.PerformanceWarning if engine == 'numexpr' else False
         with assert_produces_warning(seen):
             pd.eval('df + s', engine=engine, parser=parser)
 
@@ -1001,11 +976,7 @@ class TestAlignment(object):
 
         is_python_engine = engine == 'python'
 
-        if not is_python_engine:
-            wrn = pd.io.common.PerformanceWarning
-        else:
-            wrn = False
-
+        wrn = pd.io.common.PerformanceWarning if not is_python_engine else False
         with assert_produces_warning(wrn) as w:
             pd.eval('df + s', engine=engine, parser=parser)
 
@@ -1053,9 +1024,6 @@ class TestOperationsNumExprPandas(tm.TestCase):
 
         for op in filter(lambda x: x != '//', ops):
             ex = '1 {0} 1'.format(op)
-            ex2 = 'x {0} 1'.format(op)
-            ex3 = '1 {0} (x + 1)'.format(op)
-
             if op in ('in', 'not in'):
                 self.assertRaises(TypeError, pd.eval, ex,
                                   engine=self.engine, parser=self.parser)
@@ -1065,11 +1033,14 @@ class TestOperationsNumExprPandas(tm.TestCase):
                 tm.assert_equal(x, expec)
 
                 expec = _eval_single_bin(x, op, 1, self.engine)
+                ex2 = 'x {0} 1'.format(op)
                 y = self.eval(ex2, local_dict={'x': x}, engine=self.engine,
                               parser=self.parser)
                 tm.assert_equal(y, expec)
 
                 expec = _eval_single_bin(1, op, x + 1, self.engine)
+                ex3 = '1 {0} (x + 1)'.format(op)
+
                 y = self.eval(ex3, local_dict={'x': x},
                               engine=self.engine, parser=self.parser)
                 tm.assert_equal(y, expec)

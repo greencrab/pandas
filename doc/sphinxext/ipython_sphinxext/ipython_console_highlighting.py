@@ -97,9 +97,9 @@ class IPythonConsoleLexer(Lexer):
                         insertions = []
                 yield match.start(), Generic.Output, line
         if curcode:
-            for item in do_insertions(insertions,
-                                      pylexer.get_tokens_unprocessed(curcode)):
-                yield item
+            yield from do_insertions(
+                insertions, pylexer.get_tokens_unprocessed(curcode)
+            )
 
 
 def setup(app):

@@ -198,13 +198,11 @@ def block_parser(part, rgxin, rgxout, fmtin, fmtout):
             decorator = line_stripped
             continue
 
-        # does this look like an input line?
-        matchin = rgxin.match(line)
-        if matchin:
+        if matchin := rgxin.match(line):
             lineno, inputline = int(matchin.group(1)), matchin.group(2)
 
             # the ....: continuation string
-            continuation = '   %s:'%''.join(['.']*(len(str(lineno))+2))
+            continuation = f"   {''.join(['.'] * (len(str(lineno)) + 2))}:"
             Nc = len(continuation)
             # input lines can continue on for more than one line, if
             # we have a '\' line continuation char or a function call
@@ -238,10 +236,7 @@ def block_parser(part, rgxin, rgxout, fmtin, fmtout):
             block.append((INPUT, (decorator, inputline, '\n'.join(rest))))
             continue
 
-        # if it looks like an output line grab all the text to the end
-        # of the block
-        matchout = rgxout.match(line)
-        if matchout:
+        if matchout := rgxout.match(line):
             lineno, output = int(matchout.group(1)), matchout.group(2)
             if i<N-1:
                 output = '\n'.join([output] + lines[i:])
@@ -263,15 +258,14 @@ class DecodingStringIO(StringIO, object):
     def write(self,data):
         if isinstance(data, text_type):
             return super(DecodingStringIO, self).write(data)
-        else:
-            for enc in self.encodings:
-                try:
-                    data = data.decode(enc)
-                    return super(DecodingStringIO, self).write(data)
-                except :
-                    pass
+        for enc in self.encodings:
+            try:
+                data = data.decode(enc)
+                return super(DecodingStringIO, self).write(data)
+            except :
+                pass
         # default to brute utf8 if no encoding succeded
-            return super(DecodingStringIO, self).write(data.decode('utf8', 'replace'))
+        return super(DecodingStringIO, self).write(data.decode('utf8', 'replace'))
 
 
 class EmbeddedSphinxShell(object):
@@ -374,13 +368,13 @@ class EmbeddedSphinxShell(object):
         outfile = os.path.relpath(os.path.join(savefig_dir,filename),
                     source_dir)
 
-        imagerows = ['.. image:: %s'%outfile]
+        imagerows = [f'.. image:: {outfile}']
 
         for kwarg in saveargs[2:]:
             arg, val = kwarg.split('=')
             arg = arg.strip()
             val = val.strip()
-            imagerows.append('   :%s: %s'%(arg, val))
+            imagerows.append(f'   :{arg}: {val}')
 
         image_file = os.path.basename(outfile) # only return file name
         image_directive = '\n'.join(imagerows)
@@ -398,12 +392,12 @@ class EmbeddedSphinxShell(object):
 
         is_verbatim = decorator=='@verbatim' or self.is_verbatim
         is_doctest = (decorator is not None and \
-                     decorator.startswith('@doctest')) or self.is_doctest
+                         decorator.startswith('@doctest')) or self.is_doctest
         is_suppress = decorator=='@suppress' or self.is_suppress
         is_okexcept = decorator=='@okexcept' or self.is_okexcept
         is_okwarning = decorator=='@okwarning' or self.is_okwarning
         is_savefig = decorator is not None and \
-                     decorator.startswith('@savefig')
+                         decorator.startswith('@savefig')
 
         # set the encodings to be used by DecodingStringIO
         # to convert the execution output into unicode if
@@ -418,7 +412,7 @@ class EmbeddedSphinxShell(object):
                input_lines.append('') # make sure there's a blank line
                                        # so splitter buffer gets reset
 
-        continuation = '   %s:'%''.join(['.']*(len(str(lineno))+2))
+        continuation = f"   {''.join(['.'] * (len(str(lineno)) + 2))}:"
 
         if is_savefig:
             image_file, image_directive = self.process_image(decorator)
@@ -427,11 +421,7 @@ class EmbeddedSphinxShell(object):
         is_semicolon = False
 
         # Hold the execution count, if requested to do so.
-        if is_suppress and self.hold_count:
-            store_history = False
-        else:
-            store_history = True
-
+        store_history = not is_suppress or not self.hold_count
         # Note: catch_warnings is not thread safe
         with warnings.catch_warnings(record=True) as ws:
             for i, line in enumerate(input_lines):
@@ -446,13 +436,13 @@ class EmbeddedSphinxShell(object):
                     else:
                         # only submit the line in non-verbatim mode
                         self.process_input_line(line, store_history=store_history)
-                    formatted_line = '%s %s'%(input_prompt, line)
+                    formatted_line = f'{input_prompt} {line}'
                 else:
                     # process a continuation line
                     if not is_verbatim:
                         self.process_input_line(line, store_history=store_history)
 
-                    formatted_line = '%s %s'%(continuation, line)
+                    formatted_line = f'{continuation} {line}'
 
                 if not is_suppress:
                     ret.append(formatted_line)
@@ -515,51 +505,51 @@ class EmbeddedSphinxShell(object):
         Process data block for OUTPUT token.
 
         """
+        if not is_doctest or output is None:
+            return
+        found = output
+        found = found.strip()
+        submitted = data.strip()
+
         TAB = ' ' * 4
 
-        if is_doctest and output is not None:
+        if self.directive is None:
+            source = 'Unavailable'
+            content = 'Unavailable'
+        else:
+            source = self.directive.state.document.current_source
+            content = self.directive.content
+            # Add tabs and join into a single string.
+            content = '\n'.join([TAB + line for line in content])
 
-            found = output
-            found = found.strip()
-            submitted = data.strip()
+        # Make sure the output contains the output prompt.
+        ind = found.find(output_prompt)
+        if ind < 0:
+            e = ('output does not contain output prompt\n\n'
+                 'Document source: {0}\n\n'
+                 'Raw content: \n{1}\n\n'
+                 'Input line(s):\n{TAB}{2}\n\n'
+                 'Output line(s):\n{TAB}{3}\n\n')
+            e = e.format(source, content, '\n'.join(input_lines),
+                         repr(found), TAB=TAB)
+            raise RuntimeError(e)
+        found = found[len(output_prompt):].strip()
 
-            if self.directive is None:
-                source = 'Unavailable'
-                content = 'Unavailable'
-            else:
-                source = self.directive.state.document.current_source
-                content = self.directive.content
-                # Add tabs and join into a single string.
-                content = '\n'.join([TAB + line for line in content])
-
-            # Make sure the output contains the output prompt.
-            ind = found.find(output_prompt)
-            if ind < 0:
-                e = ('output does not contain output prompt\n\n'
+        # Handle the actual doctest comparison.
+        if decorator.strip() == '@doctest':
+            # Standard doctest
+            if found != submitted:
+                e = ('doctest failure\n\n'
                      'Document source: {0}\n\n'
                      'Raw content: \n{1}\n\n'
-                     'Input line(s):\n{TAB}{2}\n\n'
-                     'Output line(s):\n{TAB}{3}\n\n')
+                     'On input line(s):\n{TAB}{2}\n\n'
+                     'we found output:\n{TAB}{3}\n\n'
+                     'instead of the expected:\n{TAB}{4}\n\n')
                 e = e.format(source, content, '\n'.join(input_lines),
-                             repr(found), TAB=TAB)
+                             repr(found), repr(submitted), TAB=TAB)
                 raise RuntimeError(e)
-            found = found[len(output_prompt):].strip()
-
-            # Handle the actual doctest comparison.
-            if decorator.strip() == '@doctest':
-                # Standard doctest
-                if found != submitted:
-                    e = ('doctest failure\n\n'
-                         'Document source: {0}\n\n'
-                         'Raw content: \n{1}\n\n'
-                         'On input line(s):\n{TAB}{2}\n\n'
-                         'we found output:\n{TAB}{3}\n\n'
-                         'instead of the expected:\n{TAB}{4}\n\n')
-                    e = e.format(source, content, '\n'.join(input_lines),
-                                 repr(found), repr(submitted), TAB=TAB)
-                    raise RuntimeError(e)
-            else:
-                self.custom_doctest(decorator, input_lines, found, submitted)
+        else:
+            self.custom_doctest(decorator, input_lines, found, submitted)
 
     def process_comment(self, data):
         """Process data fPblock for COMMENT token."""
@@ -679,9 +669,9 @@ class EmbeddedSphinxShell(object):
                 continue
 
             # deal with lines checking for multiline
-            continuation  = u'   %s:'% ''.join(['.']*(len(str(ct))+2))
+            continuation = f"   {''.join(['.'] * (len(str(ct)) + 2))}:"
             if not multiline:
-                modified = u"%s %s" % (fmtin % ct, line_stripped)
+                modified = f"{fmtin % ct} {line_stripped}"
                 output.append(modified)
                 ct += 1
                 try:
@@ -691,7 +681,7 @@ class EmbeddedSphinxShell(object):
                     multiline = True
                     multiline_start = lineno
             else: # still on a multiline
-                modified = u'%s %s' % (continuation, line)
+                modified = f'{continuation} {line}'
                 output.append(modified)
 
                 # if the next line is indented, it should be part of multiline
@@ -808,7 +798,7 @@ class IPythonDirective(Directive):
         # reset the execution count if we haven't processed this doc
         #NOTE: this may be borked if there are multiple seen_doc tmp files
         #check time stamp?
-        if not self.state.document.current_source in self.seen_docs:
+        if self.state.document.current_source not in self.seen_docs:
             self.shell.IP.history_manager.reset()
             self.shell.IP.execution_count = 1
             self.shell.IP.prompt_manager.width = 0
@@ -824,8 +814,9 @@ class IPythonDirective(Directive):
         self.shell.hold_count = hold_count
 
         # setup bookmark for saving figures directory
-        self.shell.process_input_line('bookmark ipy_savedir %s'%savefig_dir,
-                                      store_history=False)
+        self.shell.process_input_line(
+            f'bookmark ipy_savedir {savefig_dir}', store_history=False
+        )
         self.shell.clear_cout()
 
         return rgxin, rgxout, promptin, promptout
@@ -837,8 +828,6 @@ class IPythonDirective(Directive):
         self.shell.clear_cout()
 
     def run(self):
-        debug = False
-
         #TODO, any reason block_parser can't be a method of embeddable shell
         # then we wouldn't have to carry these around
         rgxin, rgxout, promptin, promptout = self.setup()
@@ -867,7 +856,7 @@ class IPythonDirective(Directive):
             if len(block):
                 rows, figure = self.shell.process_block(block)
                 for row in rows:
-                    lines.extend(['   %s'%line for line in row.split('\n')])
+                    lines.extend([f'   {line}' for line in row.split('\n')])
 
                 if figure is not None:
                     figures.append(figure)
@@ -878,6 +867,8 @@ class IPythonDirective(Directive):
             lines.append('')
 
         if len(lines)>2:
+            debug = False
+
             if debug:
                 print('\n'.join(lines))
             else:

@@ -1,11 +1,7 @@
 from __future__ import division, absolute_import, print_function
 
 import sys
-if sys.version_info[0] >= 3:
-    from io import StringIO
-else:
-    from io import StringIO
-
+from io import StringIO
 import compiler
 import inspect
 import textwrap
@@ -75,10 +71,7 @@ class CommentBlocker(object):
     def process_file(self, file):
         """ Process a file object.
         """
-        if sys.version_info[0] >= 3:
-            nxt = file.__next__
-        else:
-            nxt = file.next
+        nxt = file.__next__ if sys.version_info[0] >= 3 else file.next
         for token in tokenize.generate_tokens(nxt):
             self.process_token(*token)
         self.make_index()
@@ -86,16 +79,17 @@ class CommentBlocker(object):
     def process_token(self, kind, string, start, end, line):
         """ Process a single token.
         """
-        if self.current_block.is_comment:
-            if kind == tokenize.COMMENT:
-                self.current_block.add(string, start, end, line)
-            else:
-                self.new_noncomment(start[0], end[0])
+        if (
+            self.current_block.is_comment
+            and kind == tokenize.COMMENT
+            or not self.current_block.is_comment
+            and kind != tokenize.COMMENT
+        ):
+            self.current_block.add(string, start, end, line)
+        elif self.current_block.is_comment:
+            self.new_noncomment(start[0], end[0])
         else:
-            if kind == tokenize.COMMENT:
-                self.new_comment(string, start, end, line)
-            else:
-                self.current_block.add(string, start, end, line)
+            self.new_comment(string, start, end, line)
 
     def new_noncomment(self, start_lineno, end_lineno):
         """ We are transitioning from a noncomment to a comment.
@@ -136,16 +130,13 @@ class CommentBlocker(object):
         if not self.index:
             self.make_index()
         block = self.index.get(lineno, None)
-        text = getattr(block, 'text', default)
-        return text
+        return getattr(block, 'text', default)
 
 
 def strip_comment_marker(text):
     """ Strip # markers at the front of a block of comment text.
     """
-    lines = []
-    for line in text.splitlines():
-        lines.append(line.lstrip('#'))
+    lines = [line.lstrip('#') for line in text.splitlines()]
     text = textwrap.dedent('\n'.join(lines))
     return text
 

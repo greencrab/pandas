@@ -22,14 +22,12 @@ import pandas._sandbox as sbx
 
 def f():
     table = sbx.StringHashTable(len(df))
-    ret = table.factorize(df['A'])
-    return ret
+    return table.factorize(df['A'])
 
 
 def g():
     table = sbx.PyObjectHashTable(len(df))
-    ret = table.factorize(df['A'])
-    return ret
+    return table.factorize(df['A'])
 
 ret = f()
 

@@ -66,7 +66,7 @@ class unstack_sparse_keyspace(object):
         self.index = MultiIndex.from_arrays([np.arange(100).repeat(100), np.roll(np.tile(np.arange(100), 100), 25)])
         self.df = DataFrame(np.random.randn(10000, 4), index=self.index)
         self.NUM_ROWS = 1000
-        for iter in range(10):
+        for _ in range(10):
             self.df = DataFrame({'A': np.random.randint(50, size=self.NUM_ROWS), 'B': np.random.randint(50, size=self.NUM_ROWS), 'C': np.random.randint((-10), 10, size=self.NUM_ROWS), 'D': np.random.randint((-10), 10, size=self.NUM_ROWS), 'E': np.random.randint(10, size=self.NUM_ROWS), 'F': np.random.randn(self.NUM_ROWS), })
             self.idf = self.df.set_index(['A', 'B', 'C', 'D', 'E'])
             if (len(self.idf.index.unique()) == self.NUM_ROWS):

@@ -67,7 +67,7 @@ def doctree_read(app, doctree):
                 # no source
                 continue
 
-            if uri in uris or not uri:
+            if uri in uris:
                 # only one link per name, please
                 continue
             uris.add(uri)

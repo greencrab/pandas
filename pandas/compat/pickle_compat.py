@@ -34,9 +34,12 @@ def load_reduce(self):
 
         # try to reencode the arguments
         if getattr(self,'encoding',None) is not None:
-            args = tuple([arg.encode(self.encoding)
-                          if isinstance(arg, string_types)
-                          else arg for arg in args])
+            args = tuple(
+                arg.encode(self.encoding)
+                if isinstance(arg, string_types)
+                else arg
+                for arg in args
+            )
             try:
                 stack[-1] = func(*args)
                 return
@@ -107,10 +110,7 @@ def load(fh, encoding=None, compat=False, is_verbose=False):
 
     try:
         fh.seek(0)
-        if encoding is not None:
-            up = Unpickler(fh, encoding=encoding)
-        else:
-            up = Unpickler(fh)
+        up = Unpickler(fh) if encoding is None else Unpickler(fh, encoding=encoding)
         up.is_verbose = is_verbose
 
         return up.load()

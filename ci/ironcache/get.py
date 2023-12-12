@@ -11,19 +11,18 @@ from hashlib import sha1
 from iron_cache import *
 import traceback as tb
 
-key='KEY.%s.%s' %(os.environ.get('TRAVIS_REPO_SLUG','unk'),
-                   os.environ.get('JOB_NAME','unk'))
+key = f"KEY.{os.environ.get('TRAVIS_REPO_SLUG', 'unk')}.{os.environ.get('JOB_NAME', 'unk')}"
 print(key)
 
 if sys.version_info[0] > 2:
     key = bytes(key,encoding='utf8')
 
-key = sha1(key).hexdigest()[:8]+'.'
+key = f'{sha1(key).hexdigest()[:8]}.'
 
 b = b''
 cache = IronCache()
 for i in range(20):
-    print("getting %s" % key+str(i))
+    print(f"getting {key}{str(i)}")
     try:
         item = cache.get(cache="travis", key=key+str(i))
         v = item.value

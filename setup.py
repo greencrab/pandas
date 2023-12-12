@@ -6,6 +6,7 @@ Parts of this file were taken from the pyzmq project
 BSD license. Parts are from lxml (https://github.com/lxml/lxml)
 """
 
+
 import os
 import sys
 import shutil
@@ -39,22 +40,26 @@ min_numpy_ver = '1.7.0'
 if sys.version_info[0] >= 3:
 
     setuptools_kwargs = {
-                         'zip_safe': False,
-                         'install_requires': ['python-dateutil >= 2',
-                                              'pytz >= 2011k',
-                                              'numpy >= %s' % min_numpy_ver],
-                         'setup_requires': ['numpy >= %s' % min_numpy_ver],
-                         }
+        'zip_safe': False,
+        'install_requires': [
+            'python-dateutil >= 2',
+            'pytz >= 2011k',
+            f'numpy >= {min_numpy_ver}',
+        ],
+        'setup_requires': [f'numpy >= {min_numpy_ver}'],
+    }
     if not _have_setuptools:
         sys.exit("need setuptools/distribute for Py3k"
                  "\n$ pip install distribute")
 
 else:
     setuptools_kwargs = {
-        'install_requires': ['python-dateutil',
-                            'pytz >= 2011k',
-                             'numpy >= %s' % min_numpy_ver],
-        'setup_requires': ['numpy >= %s' % min_numpy_ver],
+        'install_requires': [
+            'python-dateutil',
+            'pytz >= 2011k',
+            f'numpy >= {min_numpy_ver}',
+        ],
+        'setup_requires': [f'numpy >= {min_numpy_ver}'],
         'zip_safe': False,
     }
 
@@ -88,7 +93,7 @@ class build_ext(_build_ext):
         numpy_incl = pkg_resources.resource_filename('numpy', 'core/include')
 
         for ext in self.extensions:
-            if hasattr(ext, 'include_dirs') and not numpy_incl in ext.include_dirs:
+            if hasattr(ext, 'include_dirs') and numpy_incl not in ext.include_dirs:
                 ext.include_dirs.append(numpy_incl)
         _build_ext.build_extensions(self)
 
@@ -223,10 +228,7 @@ class CleanCommand(Command):
                                                '.pyo',
                                                '.pyd', '.c', '.orig'):
                     self._clean_me.append(filepath)
-            for d in dirs:
-                if d == '__pycache__':
-                    self._clean_trees.append(pjoin(root, d))
-
+            self._clean_trees.extend(pjoin(root, d) for d in dirs if d == '__pycache__')
         for d in ('build', 'dist'):
             if os.path.exists(d):
                 self._clean_trees.append(d)
@@ -280,9 +282,8 @@ class CheckSDist(sdist_class):
             self.run_command('cython')
         else:
             for pyxfile in self._pyxfiles:
-                cfile = pyxfile[:-3] + 'c'
-                msg = "C-source file '%s' not found." % (cfile) +\
-                    " Run 'setup.py cython' before sdist."
+                cfile = f'{pyxfile[:-3]}c'
+                msg = f"C-source file '{cfile}' not found. Run 'setup.py cython' before sdist."
                 assert os.path.isfile(cfile), msg
         sdist_class.run(self)
 
@@ -335,8 +336,8 @@ try:
     class BdistWheel(bdist_wheel):
         def get_tag(self):
             tag = bdist_wheel.get_tag(self)
-            repl = 'macosx_10_6_intel.macosx_10_9_intel.macosx_10_9_x86_64'
             if tag[2] == 'macosx_10_6_intel':
+                repl = 'macosx_10_6_intel.macosx_10_9_intel.macosx_10_9_x86_64'
                 tag = (tag[0], tag[1], repl)
             return tag
     cmdclass['bdist_wheel'] = BdistWheel
@@ -369,7 +370,7 @@ common_include = ['pandas/src/klib', 'pandas/src']
 
 
 def pxd(name):
-    return os.path.abspath(pjoin('pandas', name + '.pxd'))
+    return os.path.abspath(pjoin('pandas', f'{name}.pxd'))
 
 
 lib_depends = lib_depends + ['pandas/src/numpy_helper.h',
@@ -427,10 +428,12 @@ for name, data in ext_data.items():
 
     include = data.get('include', common_include)
 
-    obj = Extension('pandas.%s' % name,
-                    sources=sources,
-                    depends=data.get('depends', []),
-                    include_dirs=include)
+    obj = Extension(
+        f'pandas.{name}',
+        sources=sources,
+        depends=data.get('depends', []),
+        include_dirs=include,
+    )
 
     extensions.append(obj)
 
@@ -471,8 +474,7 @@ unpacker_ext = Extension('pandas.msgpack._unpacker',
                         language='c++',
                         include_dirs=['pandas/src/msgpack'] + common_include,
                         define_macros=macros)
-extensions.append(packer_ext)
-extensions.append(unpacker_ext)
+extensions.extend((packer_ext, unpacker_ext))
 # if not ISRELEASED:
 #     extensions.extend([sandbox_ext])
 

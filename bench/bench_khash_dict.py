@@ -54,8 +54,7 @@ def _timeit(f, iterations=10):
     start = time.time()
     for _ in range(iterations):
         foo = f()
-    elapsed = time.time() - start
-    return elapsed
+    return time.time() - start
 
 #----------------------------------------------------------------------
 # Benchmark 2: lookup_locations

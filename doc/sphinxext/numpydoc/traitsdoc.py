@@ -108,10 +108,7 @@ def looks_like_issubclass(obj, classname):
     t = obj
     if t.__name__ == classname:
         return True
-    for klass in t.__mro__:
-        if klass.__name__ == classname:
-            return True
-    return False
+    return any(klass.__name__ == classname for klass in t.__mro__)
 
 def get_doc_object(obj, what=None, config=None):
     if what is None:

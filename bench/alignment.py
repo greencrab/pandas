@@ -18,5 +18,5 @@ dma2 = pandas.DataFrame(arr2, idx1[::-1], idx2[::-1])
 lar1 = la.larry(arr1, [idx1, idx2])
 lar2 = la.larry(arr2, [idx1[::-1], idx2[::-1]])
 
-for i in range(100):
+for _ in range(100):
     result = lar1 + lar2

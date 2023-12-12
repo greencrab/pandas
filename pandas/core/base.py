@@ -39,9 +39,7 @@ class StringMixin(object):
         Yields Bytestring in Py2, Unicode String in py3.
         """
 
-        if compat.PY3:
-            return self.__unicode__()
-        return self.__bytes__()
+        return self.__unicode__() if compat.PY3 else self.__bytes__()
 
     def __bytes__(self):
         """
@@ -246,8 +244,9 @@ class FrozenList(PandasObject, list):
 
     def _disabled(self, *args, **kwargs):
         """This method will not function because object is immutable."""
-        raise TypeError("'%s' does not support mutable operations." %
-                        self.__class__.__name__)
+        raise TypeError(
+            f"'{self.__class__.__name__}' does not support mutable operations."
+        )
 
     def __unicode__(self):
         from pandas.core.common import pprint_thing
@@ -255,8 +254,7 @@ class FrozenList(PandasObject, list):
                             escape_chars=('\t', '\r', '\n'))
 
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__,
-                           str(self))
+        return f"{self.__class__.__name__}({str(self)})"
 
     __setitem__ = __setslice__ = __delitem__ = __delslice__ = _disabled
     pop = append = extend = remove = sort = insert = _disabled
@@ -267,13 +265,11 @@ class FrozenNDArray(PandasObject, np.ndarray):
     def __new__(cls, data, dtype=None, copy=False):
         if copy is None:
             copy = not isinstance(data, FrozenNDArray)
-        res = np.array(data, dtype=dtype, copy=copy).view(cls)
-        return res
+        return np.array(data, dtype=dtype, copy=copy).view(cls)
 
     def _disabled(self, *args, **kwargs):
         """This method will not function because object is immutable."""
-        raise TypeError("'%s' does not support mutable operations." %
-                        self.__class__)
+        raise TypeError(f"'{self.__class__}' does not support mutable operations.")
 
     __setitem__ = __setslice__ = __delitem__ = __delslice__ = _disabled
     put = itemset = fill = _disabled
@@ -283,8 +279,7 @@ class FrozenNDArray(PandasObject, np.ndarray):
 
     def values(self):
         """returns *copy* of underlying array"""
-        arr = self.view(np.ndarray).copy()
-        return arr
+        return self.view(np.ndarray).copy()
 
     def __unicode__(self):
         """
@@ -295,7 +290,7 @@ class FrozenNDArray(PandasObject, np.ndarray):
         """
         prepr = com.pprint_thing(self, escape_chars=('\t', '\r', '\n'),
                                  quote_strings=True)
-        return "%s(%s, dtype='%s')" % (type(self).__name__, prepr, self.dtype)
+        return f"{type(self).__name__}({prepr}, dtype='{self.dtype}')"
 
 
 class IndexOpsMixin(object):
@@ -449,10 +444,7 @@ class IndexOpsMixin(object):
         """
         from pandas.core.nanops import unique1d
         values = self.values
-        if hasattr(values,'unique'):
-            return values.unique()
-
-        return unique1d(values)
+        return values.unique() if hasattr(values,'unique') else unique1d(values)
 
     def nunique(self, dropna=True):
         """
@@ -535,7 +527,7 @@ class IndexOpsMixin(object):
         try:
             getattr(self, 'str')
         except AttributeError:
-            return set(['str'])
+            return {'str'}
         return set()
 
     _shared_docs['drop_duplicates'] = (
@@ -561,10 +553,7 @@ class IndexOpsMixin(object):
     def drop_duplicates(self, keep='first', inplace=False):
         duplicated = self.duplicated(keep=keep)
         result = self[np.logical_not(duplicated)]
-        if inplace:
-            return self._update_inplace(result)
-        else:
-            return result
+        return self._update_inplace(result) if inplace else result
 
     _shared_docs['duplicated'] = (
         """Return boolean %(duplicated)s denoting duplicate values

@@ -172,11 +172,7 @@ def khash_unique(values, expected_K, size_hint=False, sort=False,
         gc.collect()
         before_mem = proc.get_memory_info().rss
 
-    if size_hint:
-        rizer = lib.Factorizer(len(values))
-    else:
-        rizer = lib.Factorizer(100)
-
+    rizer = lib.Factorizer(len(values)) if size_hint else lib.Factorizer(100)
     result = []
     result = rizer.unique(values)
 

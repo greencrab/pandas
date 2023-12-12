@@ -1504,7 +1504,7 @@ class groupby_sum_booleans(object):
 
     def setup(self):
         self.N = 500
-        self.df = DataFrame({'ii': range(self.N), 'bb': [True for x in range(self.N)], })
+        self.df = DataFrame({'ii': range(self.N), 'bb': [True for _ in range(self.N)]})
 
     def time_groupby_sum_booleans(self):
         self.df.groupby('ii').sum()
@@ -1537,7 +1537,7 @@ class groupby_transform(object):
         self.security_ids = map((lambda x: hex(x)[2:10].upper()), range(self.secid_min, (self.secid_max + 1), self.step))
         self.data_index = MultiIndex(levels=[self.dates.values, self.security_ids], labels=[[i for i in xrange(self.n_dates) for _ in xrange(self.n_securities)], (range(self.n_securities) * self.n_dates)], names=['date', 'security_id'])
         self.n_data = len(self.data_index)
-        self.columns = Index(['factor{}'.format(i) for i in xrange(1, (self.n_columns + 1))])
+        self.columns = Index([f'factor{i}' for i in xrange(1, (self.n_columns + 1))])
         self.data = DataFrame(np.random.randn(self.n_data, self.n_columns), index=self.data_index, columns=self.columns)
         self.step = int((self.n_data * self.share_na))
         for column_index in xrange(self.n_columns):
@@ -1646,7 +1646,7 @@ class groupby_transform_ufunc(object):
         self.security_ids = map((lambda x: hex(x)[2:10].upper()), range(self.secid_min, (self.secid_max + 1), self.step))
         self.data_index = MultiIndex(levels=[self.dates.values, self.security_ids], labels=[[i for i in xrange(self.n_dates) for _ in xrange(self.n_securities)], (range(self.n_securities) * self.n_dates)], names=['date', 'security_id'])
         self.n_data = len(self.data_index)
-        self.columns = Index(['factor{}'.format(i) for i in xrange(1, (self.n_columns + 1))])
+        self.columns = Index([f'factor{i}' for i in xrange(1, (self.n_columns + 1))])
         self.data = DataFrame(np.random.randn(self.n_data, self.n_columns), index=self.data_index, columns=self.columns)
         self.step = int((self.n_data * self.share_na))
         for column_index in xrange(self.n_columns):

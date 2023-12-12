@@ -11,15 +11,15 @@ def vbench_to_asv_source(bench, kinds=None):
     if kinds is None:
         kinds = ['time']
 
-    output = 'class {}(object):\n'.format(bench.name)
+    output = f'class {bench.name}(object):\n'
     output += tab + 'goal_time = 0.2\n\n'
 
     if bench.setup:
-        indented_setup = [tab * 2 + '{}\n'.format(x) for x in bench.setup.splitlines()]
+        indented_setup = [tab * 2 + f'{x}\n' for x in bench.setup.splitlines()]
         output += tab + 'def setup(self):\n' + ''.join(indented_setup) + '\n'
 
     for kind in kinds:
-        output += tab + 'def {}_{}(self):\n'.format(kind, bench.name)
+        output += f'{tab}def {kind}_{bench.name}(self):\n'
         for line in bench.code.splitlines():
             output += tab * 2 + line + '\n'
         output += '\n\n'
@@ -47,7 +47,7 @@ class AssignToSelf(ast.NodeTransformer):
         return node
 
     def visit_TryExcept(self, node):
-        if any([isinstance(x, (ast.Import, ast.ImportFrom)) for x in node.body]):
+        if any(isinstance(x, (ast.Import, ast.ImportFrom)) for x in node.body):
             self.imports.append(node)
         else:
             self.generic_visit(node)
@@ -56,7 +56,7 @@ class AssignToSelf(ast.NodeTransformer):
     def visit_Assign(self, node):
         for target in node.targets:
             if isinstance(target, ast.Name) and not isinstance(target.ctx, ast.Param) and not self.in_class_define:
-                self.transforms[target.id] = 'self.' + target.id
+                self.transforms[target.id] = f'self.{target.id}'
         self.generic_visit(node)
 
         return node

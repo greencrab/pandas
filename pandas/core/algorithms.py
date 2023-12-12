@@ -153,10 +153,17 @@ def factorize(values, sort=False, order=None, na_sentinel=-1, size_hint=None):
             t.map_locations(com._ensure_object(uniques))
 
             # order ints before strings
-            ordered = np.concatenate([
-                np.sort(np.array([ e for i, e in enumerate(uniques) if f(e) ],dtype=object)) for f in [ lambda x: not isinstance(x,string_types),
-                                                                                                        lambda x: isinstance(x,string_types) ]
-                ])
+            ordered = np.concatenate(
+                [
+                    np.sort(
+                        np.array([e for e in uniques if f(e)], dtype=object)
+                    )
+                    for f in [
+                        lambda x: not isinstance(x, string_types),
+                        lambda x: isinstance(x, string_types),
+                    ]
+                ]
+            )
             sorter = com._ensure_platform_int(t.lookup(com._ensure_object(ordered)))
 
         reverse_indexer = np.empty(len(sorter), dtype=np.int_)
@@ -288,15 +295,15 @@ def mode(values):
     dtype = values.dtype
     if com.is_integer_dtype(values):
         values = com._ensure_int64(values)
-        result = constructor(sorted(htable.mode_int64(values)), dtype=dtype)
+        return constructor(sorted(htable.mode_int64(values)), dtype=dtype)
 
     elif issubclass(values.dtype.type, (np.datetime64, np.timedelta64)):
         dtype = values.dtype
         values = values.view(np.int64)
-        result = constructor(sorted(htable.mode_int64(values)), dtype=dtype)
+        return constructor(sorted(htable.mode_int64(values)), dtype=dtype)
 
     elif com.is_categorical_dtype(values):
-        result = constructor(values.mode())
+        return constructor(values.mode())
     else:
         mask = com.isnull(values)
         values = com._ensure_object(values)
@@ -304,10 +311,8 @@ def mode(values):
         try:
             res = sorted(res)
         except TypeError as e:
-            warn("Unable to sort modes: %s" % e)
-        result = constructor(res, dtype=dtype)
-
-    return result
+            warn(f"Unable to sort modes: {e}")
+        return constructor(res, dtype=dtype)
 
 
 def rank(values, axis=0, method='average', na_option='keep',
@@ -396,9 +401,8 @@ def quantile(x, q, interpolation_method='fraction'):
 
     if np.isscalar(q):
         return _get_score(q)
-    else:
-        q = np.asarray(q, np.float64)
-        return algos.arrmap_float64(q, _get_score)
+    q = np.asarray(q, np.float64)
+    return algos.arrmap_float64(q, _get_score)
 
 
 def _interpolate(a, b, fraction):
@@ -457,10 +461,7 @@ def _finalize_nsmallest(arr, kth_val, n, take_last, narr):
     ns, = np.nonzero(arr <= kth_val)
     inds = ns[arr[ns].argsort(kind='mergesort')][:n]
 
-    if take_last:
-        # reverse indices
-        return narr - 1 - inds
-    return inds
+    return narr - 1 - inds if take_last else inds
 
 
 def nsmallest(arr, n, take_last=False):

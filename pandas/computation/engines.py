@@ -26,12 +26,11 @@ def _check_ne_builtin_clash(expr):
         Terms can contain
     """
     names = expr.names
-    overlap = names & _ne_builtins
-
-    if overlap:
+    if overlap := names & _ne_builtins:
         s = ', '.join(map(repr, overlap))
-        raise NumExprClobberingError('Variables in expression "%s" overlap with '
-                                     'numexpr builtins: (%s)' % (expr, s))
+        raise NumExprClobberingError(
+            f'Variables in expression "{expr}" overlap with numexpr builtins: ({s})'
+        )
 
 
 class AbstractEngine(object):

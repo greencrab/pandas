@@ -74,16 +74,13 @@ TODO
   to make them appear side-by-side, or in floats.
 
 """
+
 from __future__ import division, absolute_import, print_function
 
 import sys, os, glob, shutil, imp, warnings, re, textwrap, traceback
 import sphinx
 
-if sys.version_info[0] >= 3:
-    from io import StringIO
-else:
-    from io import StringIO
-
+from io import StringIO
 import warnings
 warnings.warn("A plot_directive module is also available under "
               "matplotlib.sphinxext; expect this numpydoc.plot_directive "
@@ -130,7 +127,7 @@ def _option_boolean(arg):
     elif arg.strip().lower() in ('yes', '1', 'true'):
         return True
     else:
-        raise ValueError('"%s" unknown boolean' % arg)
+        raise ValueError(f'"{arg}" unknown boolean')
 
 def _option_format(arg):
     return directives.choice(arg, ('python', 'lisp'))
@@ -217,7 +214,7 @@ class ImageFile(object):
         self.formats = []
 
     def filename(self, format):
-        return os.path.join(self.dirname, "%s.%s" % (self.basename, format))
+        return os.path.join(self.dirname, f"{self.basename}.{format}")
 
     def filenames(self):
         return [self.filename(fmt) for fmt in self.formats]
@@ -264,11 +261,7 @@ def run(arguments, content, options, state_machine, state, lineno):
     # is it in doctest format?
     is_doctest = contains_doctest(code)
     if 'format' in options:
-        if options['format'] == 'python':
-            is_doctest = False
-        else:
-            is_doctest = True
-
+        is_doctest = options['format'] != 'python'
     # determine output directory name fragment
     source_rel_name = relpath(source_file_name, setup.confdir)
     source_rel_dir = os.path.dirname(source_rel_name)
@@ -290,7 +283,7 @@ def run(arguments, content, options, state_machine, state, lineno):
     dest_dir_link = os.path.join(relpath(setup.confdir, rst_dir),
                                  source_rel_dir).replace(os.path.sep, '/')
     build_dir_link = relpath(build_dir, rst_dir).replace(os.path.sep, '/')
-    source_link = dest_dir_link + '/' + output_base + source_ext
+    source_link = f'{dest_dir_link}/{output_base}{source_ext}'
 
     # make figures
     try:
@@ -300,13 +293,18 @@ def run(arguments, content, options, state_machine, state, lineno):
     except PlotError as err:
         reporter = state.memo.reporter
         sm = reporter.system_message(
-            2, "Exception occurred in plotting %s: %s" % (output_base, err),
-            line=lineno)
+            2,
+            f"Exception occurred in plotting {output_base}: {err}",
+            line=lineno,
+        )
         results = [(code, [])]
         errors = [sm]
 
     # generate output restructuredtext
     total_lines = []
+    only_html = ".. only:: html"
+    only_latex = ".. only:: latex"
+
     for j, (code_piece, images) in enumerate(results):
         if options['include-source']:
             if is_doctest:
@@ -314,23 +312,18 @@ def run(arguments, content, options, state_machine, state, lineno):
                 lines += [row.rstrip() for row in code_piece.split('\n')]
             else:
                 lines = ['.. code-block:: python', '']
-                lines += ['    %s' % row.rstrip()
-                          for row in code_piece.split('\n')]
+                lines += [f'    {row.rstrip()}' for row in code_piece.split('\n')]
             source_code = "\n".join(lines)
         else:
             source_code = ""
 
-        opts = [':%s: %s' % (key, val) for key, val in list(options.items())
-                if key in ('alt', 'height', 'width', 'scale', 'align', 'class')]
+        opts = [
+            f':{key}: {val}'
+            for key, val in list(options.items())
+            if key in ('alt', 'height', 'width', 'scale', 'align', 'class')
+        ]
 
-        only_html = ".. only:: html"
-        only_latex = ".. only:: latex"
-
-        if j == 0:
-            src_link = source_link
-        else:
-            src_link = None
-
+        src_link = source_link if j == 0 else None
         result = format_template(
             TEMPLATE,
             dest_dir=dest_dir_link,
@@ -363,10 +356,8 @@ def run(arguments, content, options, state_machine, state, lineno):
     # copy script (if necessary)
     if source_file_name == rst_file:
         target_name = os.path.join(dest_dir, output_base + source_ext)
-        f = open(target_name, 'w')
-        f.write(unescape_doctest(code))
-        f.close()
-
+        with open(target_name, 'w') as f:
+            f.write(unescape_doctest(code))
     return errors
 
 
@@ -404,11 +395,10 @@ def unescape_doctest(text):
 
     code = ""
     for line in text.split("\n"):
-        m = re.match(r'^\s*(>>>|\.\.\.) (.*)$', line)
-        if m:
+        if m := re.match(r'^\s*(>>>|\.\.\.) (.*)$', line):
             code += m.group(2) + "\n"
         elif line.strip():
-            code += "# " + line.strip() + "\n"
+            code += f"# {line.strip()}" + "\n"
         else:
             code += "\n"
     return code
@@ -455,17 +445,16 @@ def run_code(code, code_path, ns=None):
     # Reset sys.argv
     old_sys_argv = sys.argv
     sys.argv = [code_path]
-    
+
     try:
-        try:
-            code = unescape_doctest(code)
-            if ns is None:
-                ns = {}
-            if not ns:
-                exec(setup.config.plot_pre_code, ns)
-            exec(code, ns)
-        except (Exception, SystemExit) as err:
-            raise PlotError(traceback.format_exc())
+        code = unescape_doctest(code)
+        if ns is None:
+            ns = {}
+        if not ns:
+            exec(setup.config.plot_pre_code, ns)
+        exec(code, ns)
+    except (Exception, SystemExit) as err:
+        raise PlotError(traceback.format_exc())
     finally:
         os.chdir(pwd)
         sys.argv = old_sys_argv
@@ -593,7 +582,7 @@ except ImportError:
         def relpath(path, start=os.path.curdir):
             """Return a relative version of a path"""
             from os.path import sep, curdir, join, abspath, commonprefix, \
-                 pardir
+                         pardir
 
             if not path:
                 raise ValueError("no path specified")
@@ -605,14 +594,12 @@ except ImportError:
             i = len(commonprefix([start_list, path_list]))
 
             rel_list = [pardir] * (len(start_list)-i) + path_list[i:]
-            if not rel_list:
-                return curdir
-            return join(*rel_list)
+            return curdir if not rel_list else join(*rel_list)
     elif 'nt' in sys.builtin_module_names:
         def relpath(path, start=os.path.curdir):
             """Return a relative version of a path"""
             from os.path import sep, curdir, join, abspath, commonprefix, \
-                 pardir, splitunc
+                         pardir, splitunc
 
             if not path:
                 raise ValueError("no path specified")
@@ -622,11 +609,11 @@ except ImportError:
                 unc_path, rest = splitunc(path)
                 unc_start, rest = splitunc(start)
                 if bool(unc_path) ^ bool(unc_start):
-                    raise ValueError("Cannot mix UNC and non-UNC paths (%s and %s)"
-                                                                        % (path, start))
+                    raise ValueError(f"Cannot mix UNC and non-UNC paths ({path} and {start})")
                 else:
-                    raise ValueError("path is on drive %s, start on drive %s"
-                                                        % (path_list[0], start_list[0]))
+                    raise ValueError(
+                        f"path is on drive {path_list[0]}, start on drive {start_list[0]}"
+                    )
             # Work out how much of the filepath is shared by start and path.
             for i in range(min(len(start_list), len(path_list))):
                 if start_list[i].lower() != path_list[i].lower():
@@ -635,8 +622,6 @@ except ImportError:
                 i += 1
 
             rel_list = [pardir] * (len(start_list)-i) + path_list[i:]
-            if not rel_list:
-                return curdir
-            return join(*rel_list)
+            return curdir if not rel_list else join(*rel_list)
     else:
         raise RuntimeError("Unsupported platform (no relpath available!)")

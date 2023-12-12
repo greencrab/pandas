@@ -351,11 +351,14 @@ with cf.config_prefix('io.excel'):
         cf.register_option(ext + '.writer', default, doc, validator=str)
 
     def _register_xlsx(engine, other):
-        cf.register_option('xlsx.writer', engine,
-                           writer_engine_doc.format(ext='xlsx',
-                                                    default=engine,
-                                                    others=", '%s'" % other),
-                           validator=str)
+        cf.register_option(
+            'xlsx.writer',
+            engine,
+            writer_engine_doc.format(
+                ext='xlsx', default=engine, others=f", '{other}'"
+            ),
+            validator=str,
+        )
 
     try:
         # better memory footprint

@@ -63,7 +63,7 @@ for sort in [False]:
                and left.key2 = right.key2;""" % join_method
 
         if sort:
-            sql = '%s order by key, key2' % sql
+            sql = f'{sql} order by key, key2'
         f = lambda: list(conn.execute(sql))  # list fetches results
         g = lambda: conn.execute(sql)  # list fetches results
         gc.disable()

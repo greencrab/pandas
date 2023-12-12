@@ -135,8 +135,7 @@ class Scope(StringMixin):
     def __unicode__(self):
         scope_keys = _get_pretty_string(list(self.scope.keys()))
         res_keys = _get_pretty_string(list(self.resolvers.keys()))
-        return '%s(scope=%s, resolvers=%s)' % (type(self).__name__, scope_keys,
-                                               res_keys)
+        return f'{type(self).__name__}(scope={scope_keys}, resolvers={res_keys})'
 
     @property
     def has_resolvers(self):
